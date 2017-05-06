@@ -19,6 +19,8 @@
 #include <sstream>
 #include <fstream>
 
+#include "TCPheader.h"
+
 #define MAX_PATH_LENGTH        4096
 
 int main(int argc, char* argv[])
