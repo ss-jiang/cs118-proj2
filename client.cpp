@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
   }
 
   // create a socket using TCP IP
-  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
   // set non-blocking to check timeout
   arg = fcntl(sockfd, F_GETFL, NULL); 
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
   memset(&hints, 0, sizeof(hints));
   hints.ai_flags = AI_PASSIVE; 
   hints.ai_family = AF_INET; // AF_INET specifies IPv4
-  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_socktype = SOCK_DGRAM;
 
   // e.g. "www.example.com" or IP; e.g. "http" or port number
   if ((status = getaddrinfo(argv[1], argv[2], &hints, &res)) != 0) {
@@ -69,48 +69,49 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  // TIMEOUT FROM http://developerweb.net/viewtopic.php?id=3196
-  int cv = connect(sockfd, res->ai_addr, res->ai_addrlen);
-  if (cv < 0) { 
-    if (errno == EINPROGRESS) { 
-      while(1) 
-      { 
-        tv.tv_sec = 10; 
-        tv.tv_usec = 0; 
-        FD_ZERO(&myset); 
-        FD_SET(sockfd, &myset); 
+  // UDP has no concept of connection
+  // // TIMEOUT FROM http://developerweb.net/viewtopic.php?id=3196
+  // int cv = connect(sockfd, res->ai_addr, res->ai_addrlen);
+  // if (cv < 0) { 
+  //   if (errno == EINPROGRESS) { 
+  //     while(1) 
+  //     { 
+  //       tv.tv_sec = 10; 
+  //       tv.tv_usec = 0; 
+  //       FD_ZERO(&myset); 
+  //       FD_SET(sockfd, &myset); 
 
-        cv = select(sockfd+1, NULL, &myset, NULL, &tv); 
-        if (cv < 0 && errno != EINTR) { 
-          std::cerr << "ERROR: Error connecting\n";
-          exit(1);
-        } 
-        else if (cv > 0) { 
-          // Socket selected for write 
-          lon = sizeof(int); 
-          if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) { 
-            std::cerr << "ERROR: Error in getsockopt()\n";
-            exit(1); 
-          } 
-          if (valopt) { 
-            std::cerr << "ERROR: Error in delayed connection()\n"; 
-            exit(1); 
-          } 
-          break; 
-        } 
-        else 
-        { 
-          std::cerr << "ERROR: Timeout while connecting\n"; 
-          exit(1); 
-        } 
-      } 
-    } 
-    else 
-    { 
-      std::cerr << "ERROR: Error connecting\n";
-      exit(1); 
-    } 
-  } 
+  //       cv = select(sockfd+1, NULL, &myset, NULL, &tv); 
+  //       if (cv < 0 && errno != EINTR) { 
+  //         std::cerr << "ERROR: Error connecting\n";
+  //         exit(1);
+  //       } 
+  //       else if (cv > 0) { 
+  //         // Socket selected for write 
+  //         lon = sizeof(int); 
+  //         if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) { 
+  //           std::cerr << "ERROR: Error in getsockopt()\n";
+  //           exit(1); 
+  //         } 
+  //         if (valopt) { 
+  //           std::cerr << "ERROR: Error in delayed connection()\n"; 
+  //           exit(1); 
+  //         } 
+  //         break; 
+  //       } 
+  //       else 
+  //       { 
+  //         std::cerr << "ERROR: Timeout while connecting\n"; 
+  //         exit(1); 
+  //       } 
+  //     } 
+  //   } 
+  //   else 
+  //   { 
+  //     std::cerr << "ERROR: Error connecting\n";
+  //     exit(1); 
+  //   } 
+  // } 
   // Set to blocking mode again... 
   arg = fcntl(sockfd, F_GETFL, NULL); 
   arg &= (~O_NONBLOCK); 
@@ -122,7 +123,7 @@ int main(int argc, char* argv[])
     std::cerr << "ERROR: Failed to get socket name" << std::endl;
     exit(1);
   }
-  sleep(20);
+  // sleep(20);
   inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
   std::cout << "Set up a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
@@ -132,8 +133,9 @@ int main(int argc, char* argv[])
 
   while(!open_file.eof())
   {
-    open_file.read(in_buffer, 1500);
-    int sent = send(sockfd, in_buffer, open_file.gcount(), 0);
+    open_file.read(in_buffer, 512);
+
+    int sent = sendto(sockfd, in_buffer, 512, 0, (struct sockaddr*)&clientAddr, clientAddrLen);
     if (sent > 0)
     {
       wc += sent;
@@ -143,6 +145,17 @@ int main(int argc, char* argv[])
       std::cerr << "ERROR: Could not send file\n";
       exit(1); 
     }
+
+    // int sent = send(sockfd, in_buffer, open_file.gcount(), 0);
+    // if (sent > 0)
+    // {
+    //   wc += sent;
+    // }
+    // if (sent == -1)
+    // {
+    //   std::cerr << "ERROR: Could not send file\n";
+    //   exit(1); 
+    // }
   }
   std::cout << "Sent file: " << file_name << std::endl;
   std::cout << "Bytes: " << wc << std::endl;

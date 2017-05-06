@@ -28,74 +28,71 @@ void signal_handler(int signum)
 	exit(0);
 }
 
-void handle_thread(struct sockaddr_in clientAddr, int clientSockfd, int connection_number, std::string file_dir)
-{
-	char ipstr[INET_ADDRSTRLEN] = {'\0'};
+// void handle_thread(struct sockaddr_in clientAddr, int clientSockfd, int connection_number, std::string file_dir)
+// {
+// 	char ipstr[INET_ADDRSTRLEN] = {'\0'};
 
-	inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-	std::cout << "Accept a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
+// 	inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
+// 	std::cout << "Accept a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
-	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
+// 	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
 
-	// Set to blocking mode again... 
-	long arg = fcntl(clientSockfd, F_GETFL, NULL); 
-	arg &= (~O_NONBLOCK); 
-	fcntl(clientSockfd, F_SETFL, arg); 
+// 	// Set to blocking mode again... 
+// 	long arg = fcntl(clientSockfd, F_GETFL, NULL); 
+// 	arg &= (~O_NONBLOCK);
+// 	fcntl(clientSockfd, F_SETFL, arg); 
 
-	// timeout variables
-	fd_set readfds;
-	struct timeval tv;
-	FD_ZERO(&readfds);
-	FD_SET(clientSockfd, &readfds);
-	tv.tv_sec = 10;
-	int rv = select(clientSockfd+1, &readfds, NULL, NULL, &tv);
+// 	// timeout variables
+// 	fd_set readfds;
+// 	struct timeval tv;
+// 	FD_ZERO(&readfds);
+// 	FD_SET(clientSockfd, &readfds);
+// 	tv.tv_sec = 10;
+// 	int rv = select(clientSockfd+1, &readfds, NULL, NULL, &tv);
 
-	if (rv == -1) 
-	{
-		std::cerr << "ERROR: Select() failure" << std::endl;
-	    exit(1);
-	} 
-	else if (rv == 0) 
-	{
-		// variables used to open and write to a file
-		std::ofstream new_file;
-		new_file.open(save_name, std::ios::out | std::ios::binary);
+// 	if (rv == -1) 
+// 	{
+// 		std::cerr << "ERROR: Select() failure" << std::endl;
+// 	    exit(1);
+// 	} 
+// 	else if (rv == 0) 
+// 	{
+// 		// variables used to open and write to a file
+// 		std::ofstream new_file;
+// 		new_file.open(save_name, std::ios::out | std::ios::binary);
 
-		//std::string err = "ERROR";
-		new_file.write("ERROR", 5);
-	    std::cerr << "Timeout occurred:  No data after 10 seconds\n";
-	} 
-	else 
-	{
-		// variables used to open and write to a file
-		std::ofstream new_file;
-		new_file.open(save_name, std::ios::out | std::ios::binary);
-		char receive_buf[1024] = {0};
-		int file_size = 0;
-		int rc = 0;
+// 		//std::string err = "ERROR";
+// 		new_file.write("ERROR", 5);
+// 	    std::cerr << "Timeout occurred:  No data after 10 seconds\n";
+// 	} 
+// 	else 
+// 	{
+// 		// variables used to open and write to a file
+// 		std::ofstream new_file;
+// 		new_file.open(save_name, std::ios::out | std::ios::binary);
+// 		char receive_buf[1024] = {0};
+// 		int file_size = 0;
+// 		int rc = 0;
 
-		/* get the file name from the client */
-	    while( (rc = recv(clientSockfd, receive_buf, sizeof(receive_buf), 0)) > 0)
-	    {
-		    if (rc == -1) {
-		    	std::cerr << "ERROR: recv() failed\n";
-				exit(1);
-		    }
+// 		/* get the file name from the client */
+// 	    while( (rc = recv(clientSockfd, receive_buf, sizeof(receive_buf), 0)) > 0)
+// 	    {
+// 		    if (rc == -1) {
+// 		    	std::cerr << "ERROR: recv() failed\n";
+// 				exit(1);
+// 		    }
 
-		    new_file.write(receive_buf, rc);
-		    file_size += rc;
-		    memset(receive_buf, 0, sizeof(receive_buf));
-		}
+// 		    new_file.write(receive_buf, rc);
+// 		    file_size += rc;
+// 		    memset(receive_buf, 0, sizeof(receive_buf));
+// 		}
 
-		std::cout << "Saved file as " << save_name << " : " << file_size << " bytes\n";
-		file_size = 0;
-		new_file.close();
-	}
-
-	close(clientSockfd);
-}
-
-
+// 		std::cout << "Saved file as " << save_name << " : " << file_size << " bytes\n";
+// 		file_size = 0;
+// 		new_file.close();
+// 	}
+// 	close(clientSockfd);
+// 
 int main(int argc, char* argv[])
 {
 	if (argc < 3) {
@@ -127,7 +124,7 @@ int main(int argc, char* argv[])
 	memset(&hints, 0, sizeof(hints));
     hints.ai_flags = AI_PASSIVE; 
     hints.ai_family = AF_INET; // AF_INET specifies IPv4
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = SOCK_DGRAM;
 
     // e.g. "www.example.com" or IP; e.g. "http" or port number
 	if ((status = getaddrinfo(NULL, argv[1], &hints, &res)) != 0) {
@@ -135,7 +132,7 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-	// create a socket using TCP IP
+	// create a socket for UDP
 	int sockfd = socket(res->ai_family, res->ai_socktype, 0);
 	if (sockfd == -1) {
 		std::cerr << "ERROR: Failed to create socket" << std::endl;
@@ -162,26 +159,44 @@ int main(int argc, char* argv[])
 	}
 
 	// accept a new connection
-	struct sockaddr_in clientAddr;
+	struct sockaddr clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
 	int clientSockfd;
 	int connection_number = 0;
+	char buf[524];
+	int rc = 0;
+	int file_size = 0;
 
-	while ((clientSockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientAddrSize)) && !SIG_HANDLER_CALLED) 
-	{
-
-		if (clientSockfd == -1) {
-			std::cerr << "ERROR: Failed to get accept connection" << std::endl;
+	// UDP, don't need to connect since no concept of connection
+	// use recvfrom() to read
+	while( (rc = recvfrom(sockfd, buf, sizeof buf, 0, &clientAddr, &clientAddrSize)) > 0)
+    {
+	    if (rc == -1) {
+	    	std::cerr << "ERROR: recv() failed\n";
 			exit(1);
-		}
+	    }
 
-		// Create a thread for each new accepted fd
-		connection_number++;
-		std::thread(handle_thread, clientAddr, clientSockfd, connection_number, file_dir).detach();
+	    // new_file.write(receive_buf, rc);
+	    file_size += rc;
+	    memset(buf, 0, sizeof(buf));
 	}
 
+
+	// while ((clientSockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientAddrSize)) && !SIG_HANDLER_CALLED) 
+	// {
+
+	// 	if (clientSockfd == -1) {
+	// 		std::cerr << "ERROR: Failed to get accept connection" << std::endl;
+	// 		exit(1);
+	// 	}
+
+	// 	// Create a thread for each new accepted fd
+	// 	connection_number++;
+	// 	std::thread(handle_thread, clientAddr, clientSockfd, connection_number, file_dir).detach();
+	// }
+
 	close(sockfd);
-	close(clientSockfd);
+	// close(clientSockfd);
 
    	exit(0);
 }
