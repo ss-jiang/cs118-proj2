@@ -165,10 +165,11 @@ int main(int argc, char* argv[])
 	}
 
 	// set socket to listen status
-	if (listen(sockfd, 1) == -1) {
-		std::cerr << "ERROR: Failed to listen to socket" << std::endl;
-		exit(-1);
-	}
+	// UDP does not need to listen since it's connectionless
+	// if (listen(sockfd, 1) == -1) {
+	// 	std::cerr << "ERROR: Failed to listen to socket" << std::endl;
+	// 	exit(-1);
+	// }
 
 	// accept a new connection
 	struct sockaddr clientAddr;
