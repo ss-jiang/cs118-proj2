@@ -16,6 +16,8 @@
 #include <thread>
 #include <iostream>
 
+#include "TCPheader.h"
+
 // server is called with the following parameters
 // server <PORT> <FILE-DIR>
 
@@ -99,6 +101,16 @@ int main(int argc, char* argv[])
       	std::cerr << "ERROR: server must be called with exactly two parameters: <PORT> <FILE-DIR>" << std::endl;
       	exit(-1);
    	}
+
+   	uint32_t seqNum = 102; 
+   	uint32_t ackNum = 161; 
+   	uint16_t cid = 5; 
+   	bool ack = true; 
+   	bool syn = false; 
+   	bool fin = true; 
+
+   	TCPheader header(seqNum, ackNum, cid, ack, syn, fin); 
+   	header.printInfo();
 
    	// Handle signals
    	struct sigaction act;
