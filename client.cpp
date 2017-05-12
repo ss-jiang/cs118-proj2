@@ -50,8 +50,8 @@ int main(int argc, char* argv[])
     // create a socket using UDP
   int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-  // set non-blocking to check timeout
-  // arg = fcntl(sockfd, F_GETFL, NULL); 
+  // // set non-blocking
+  // long arg = fcntl(sockfd, F_GETFL, NULL); 
   // arg |= O_NONBLOCK; 
   // fcntl(sockfd, F_SETFL, arg); 
 
@@ -71,9 +71,15 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
+  // buffer to send out to server
   std::ifstream open_file (file_name.c_str(), std::ios::in | std::ios::binary );
   char read_buffer[512];
   int wc = 0;
+
+  // buffer to receive from server
+  char recv_buffer[12];
+  struct sockaddr_storage clientAddr;
+  socklen_t clientAddrSize = sizeof(clientAddr);
 
   //build UDP packet
   std::string src_addr = "127.0.0.1"; 
@@ -95,21 +101,41 @@ int main(int argc, char* argv[])
   // reads the buffer and translate it to UDP header
   headers.parseBuffer(buf); 
 
+
+  int sent = 0;
+  int recv = 0;
   while(!open_file.eof())
   {
     open_file.read(read_buffer, 512);
     strcat((char*) buf, read_buffer);
 
-    int sent = sendto(sockfd, buf, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
+    sent = sendto(sockfd, buf, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
     if (sent > 0)
     {
-      std::cout << "WC: " << sent << std::endl;
       wc += sent;
+
+      if ((recv = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, res->ai_addr, &res->ai_addrlen) > 0))
+      {
+        if (recv > 0)
+        {
+          std::cout << ">>>>>>>>>>>>> Response received\n";
+          TCPheader recv_header;
+          recv_header.parseBuffer((unsigned char*) recv_buffer);
+          recv_header.printInfo();
+        }
+      }
     }
     if (sent == -1)
     {
       std::cerr << "ERROR: Could not send file\n";
       exit(1); 
+    }
+    if (open_file.eof())
+    {
+      std::cout << ">>>>>>>>>>>>>>> sending fin\n";
+      TCPheader fin_header(99999, 888, 1, 0, 0, 1);
+      fin_header.printInfo();
+      sendto(sockfd, fin_header.toCharBuffer(), 12, 0, res->ai_addr, res->ai_addrlen);
     }
   }
   std::cout << "Sent file: " << file_name << std::endl;

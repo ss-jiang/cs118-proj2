@@ -102,15 +102,15 @@ int main(int argc, char* argv[])
       	exit(-1);
    	}
 
-   	uint32_t seqNum = 102; 
-   	uint32_t ackNum = 161; 
-   	uint16_t cid = 5; 
-   	bool ack = true; 
-   	bool syn = false; 
-   	bool fin = true; 
+   	// uint32_t seqNum = 102; 
+   	// uint32_t ackNum = 161; 
+   	// uint16_t cid = 5; 
+   	// bool ack = true; 
+   	// bool syn = false; 
+   	// bool fin = true; 
 
-   	TCPheader header(seqNum, ackNum, cid, ack, syn, fin); 
-   	header.printInfo();
+   	// TCPheader header(seqNum, ackNum, cid, ack, syn, fin); 
+   	// header.printInfo();
 
    	// Handle signals
    	struct sigaction act;
@@ -119,7 +119,6 @@ int main(int argc, char* argv[])
    	sigaction(SIGTERM, &act, NULL);
    	// FOR TESTING PURPOSES: Ctrl-C
    	// sigaction(SIGINT, &act, NULL);
-
 	
    	int port_num = atoi(argv[1]);
    	std::string file_dir = argv[2];
@@ -131,7 +130,6 @@ int main(int argc, char* argv[])
 	    std::cerr << "ERROR: Port number out of range [1024 - 65535]" << std::endl;
 	    exit(1);
 	}
-
 
 	memset(&hints, 0, sizeof(hints));
     hints.ai_flags = AI_PASSIVE; 
@@ -163,6 +161,12 @@ int main(int argc, char* argv[])
 		std::cerr << "ERROR: Failed to bind to socket" << std::endl;
 		exit(-1);
 	}
+
+	// set non-blocking
+	long arg = fcntl(sockfd, F_GETFL, NULL); 
+	arg |= O_NONBLOCK; 
+	fcntl(sockfd, F_SETFL, arg); 
+
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
 	// if (listen(sockfd, 1) == -1) {
@@ -173,12 +177,11 @@ int main(int argc, char* argv[])
 	// accept a new connection
 	struct sockaddr_storage clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
-
-	// recvfrom(sock, message, sizeof(message), 0, (struct sockaddr*)&sender, &sendsize);
-
-	// int clientSockfd;
 	int connection_number = 0;
 	char buf[524];
+
+	// response header
+	char resp_buf[12];
 
 	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
 	// variables used to open and write to a file
@@ -186,38 +189,53 @@ int main(int argc, char* argv[])
 	new_file.open(save_name, std::ios::out | std::ios::binary);
 	int file_size = 0;
 
+	int a = 11111;
+    int b = 222;
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
 	while(1)
 	{
-		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-	    if (rc == -1) {
-	    	std::cerr << "ERROR: recvfrom() failed\n";
-			exit(1);
-	    }
-	    else if (rc > 0)
-	    {
-		    new_file.write(buf, rc);
-		    file_size += rc;
-		    memset(buf, 0, sizeof(buf));
-		    std::cout << "File size: " << file_size << std::endl;
-		    new_file.close();
-	    }
+		int rc = 0;
+		while( (rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize) > 0))
+		{
+			if (rc == -1) 
+		    {
+		    	std::cerr << "ERROR: recvfrom() failed\n";
+				exit(1);
+		    }
+		    else if (rc > 0)
+		    {
+			    new_file.write(buf, (rc-12));
+			    file_size += (rc-12);
+			    memset(buf, 0, sizeof(buf));
+
+
+			    TCPheader resp_header(a, b, 1, 1, 0, 0);
+
+			    int sent = 0;
+			    if ( (sent = sendto(sockfd, resp_header.toCharBuffer(), sizeof(resp_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
+			    {
+			      if (sent == -1)
+			      {
+			        std::cerr << "ERROR: Could not send response header\n";
+			        exit(1); 
+			      }
+			      else
+			      {
+			      	std::cout << ">>>>>>>>>>>>> response sent\n";
+			      	a++;
+			      	b++;
+			      }
+			    }
+		    }
+		    else if (rc == 0)
+		    {
+		    	std::cout << "File size: " << file_size << std::endl;
+				new_file.close();
+		    }
+		}
 	}
-	
 
-	// while ((clientSockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientAddrSize)) && !SIG_HANDLER_CALLED) 
-	// {
-
-	// 	if (clientSockfd == -1) {
-	// 		std::cerr << "ERROR: Failed to get accept connection" << std::endl;
-	// 		exit(1);
-	// 	}
-
-	// 	// Create a thread for each new accepted fd
-	// 	connection_number++;
-	// 	std::thread(handle_thread, clientAddr, clientSockfd, connection_number, file_dir).detach();
-	// }
 
 	close(sockfd);
 	// close(clientSockfd);
