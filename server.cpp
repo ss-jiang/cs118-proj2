@@ -195,45 +195,60 @@ int main(int argc, char* argv[])
 	// use recvfrom() to read
 	while(1)
 	{
-		int rc = 0;
-		while( (rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize) > 0))
-		{
-			if (rc == -1) 
-		    {
-		    	std::cerr << "ERROR: recvfrom() failed\n";
-				exit(1);
+		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+		
+			// if (rc == -1) 
+		 //    {
+		 //    	std::cerr << "ERROR: recvfrom() failed\n";
+			// 	exit(1);
+		 //    }
+	    if (rc > 0)
+	    {
+		    char* headers_buf = new char[12]; 
+	    	char data_buffer[512];
+		    for(int i = 0; i < 12; i++) {
+		    	headers_buf[i] = buf[i]; 
 		    }
-		    else if (rc > 0)
-		    {
-			    new_file.write(buf, (rc-12));
-			    file_size += (rc-12);
-			    memset(buf, 0, sizeof(buf));
+		    TCPheader header; 
+	    	int j = 0;
+		    header.parseBuffer(headers_buf);
 
-
-			    TCPheader resp_header(a, b, 1, 1, 0, 0);
-
-			    int sent = 0;
-			    if ( (sent = sendto(sockfd, resp_header.toCharBuffer(), sizeof(resp_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
-			    {
-			      if (sent == -1)
-			      {
-			        std::cerr << "ERROR: Could not send response header\n";
-			        exit(1); 
-			      }
-			      else
-			      {
-			      	std::cout << ">>>>>>>>>>>>> response sent\n";
-			      	a++;
-			      	b++;
-			      }
-			    }
+		    for(int i = 12; i < 524; i++) {
+		    	data_buffer[j] = buf[i];
+		    	j++;
 		    }
-		    else if (rc == 0)
+		    new_file.write(data_buffer, rc - 12);
+		    std::cout << data_buffer << std::endl;
+		    file_size += rc;
+		    memset(buf, 0, sizeof(buf));
+		    std::cout << "File size: " << file_size << std::endl;
+		    new_file.close();
+
+		    // responds to receiving a packet from the client
+		    // response headers needs to be set up with the receiver header's ack number
+		    TCPheader resp_header(a, b, 1, 1, 0, 0);
+
+		    int sent = 0;
+		    if ( (sent = sendto(sockfd, resp_header.toCharBuffer(), sizeof(resp_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
 		    {
-		    	std::cout << "File size: " << file_size << std::endl;
-				new_file.close();
+		      if (sent == -1)
+		      {
+		        std::cerr << "ERROR: Could not send response header\n";
+		        exit(1); 
+		      }
+		      else
+		      {
+		      	std::cout << ">>>>>>>>>>>>> response sent\n";
+		      	a++;
+		      	b++;
+		      }
 		    }
-		}
+	    }
+	    else if (rc == 0)
+	    {
+	    	std::cout << "File size: " << file_size << std::endl;
+			new_file.close();
+	    }
 	}
 
 

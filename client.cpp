@@ -96,20 +96,31 @@ int main(int argc, char* argv[])
   // send UDP headers
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   header.printInfo();
-  unsigned char* buf = header.toCharBuffer(); 
+  char* buf = header.toCharBuffer(); 
   TCPheader headers; 
   // reads the buffer and translate it to UDP header
+  char packet_buffer[524]; 
+  for(int i = 0; i < 12; i++) {
+    packet_buffer[i] = buf[i];
+  }
   headers.parseBuffer(buf); 
 
 
-  int sent = 0;
+  // int sent = 0;
   int recv = 0;
   while(!open_file.eof())
   {
+    // reading the file
     open_file.read(read_buffer, 512);
-    strcat((char*) buf, read_buffer);
+ 
+    // adding headers to packet
+    int j = 0;
+    for(int i = 12; i < 524; i++) {
+      packet_buffer[i] = read_buffer[j];
+      j++;
+    }
 
-    sent = sendto(sockfd, buf, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
+    int sent = sendto(sockfd, packet_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
     if (sent > 0)
     {
       wc += sent;
@@ -120,7 +131,7 @@ int main(int argc, char* argv[])
         {
           std::cout << ">>>>>>>>>>>>> Response received\n";
           TCPheader recv_header;
-          recv_header.parseBuffer((unsigned char*) recv_buffer);
+          recv_header.parseBuffer((char*) recv_buffer);
           recv_header.printInfo();
         }
       }
@@ -130,6 +141,8 @@ int main(int argc, char* argv[])
       std::cerr << "ERROR: Could not send file\n";
       exit(1); 
     }
+
+    // send fin packet when done sending the file
     if (open_file.eof())
     {
       std::cout << ">>>>>>>>>>>>>>> sending fin\n";
