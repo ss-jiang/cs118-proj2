@@ -27,6 +27,7 @@ public:
 	void printInfo(); 
 	void setFlags(bool ack, bool syn, bool fin); 
 	unsigned char* toCharBuffer(); 
+	void parseBuffer(unsigned char* buffer); 
 }; 
 
 #endif //TCPheader 

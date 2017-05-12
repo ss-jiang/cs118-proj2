@@ -95,3 +95,15 @@ unsigned char* TCPheader::toCharBuffer() {
                         (unsigned char)buf[11]);
 	return buf;
 }
+
+void TCPheader::parseBuffer(unsigned char* buf) {
+	seq_num = ((buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + buf[3]);
+	ack_num = ((buf[4] << 24) + (buf[5] << 16) + (buf[6] << 8) + buf[7]);
+	connection_id = ((buf[8] << 8) + buf[9]); 
+	flags = ((buf[10] << 8) + buf[11]);
+
+	std::cout << seq_num << std::endl;
+	std::cout << ack_num << std::endl;
+	std::cout << connection_id << std::endl;
+	std::cout << flags << std::endl;
+}

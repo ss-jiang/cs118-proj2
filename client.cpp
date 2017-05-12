@@ -153,6 +153,8 @@ int main(int argc, char* argv[])
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   header.printInfo();
   unsigned char* buf = header.toCharBuffer(); 
+  TCPheader headers; 
+  headers.parseBuffer(buf); 
 
   int sent = sendto(sockfd, buf, 12, 0, (struct sockaddr*)&clientAddr, clientAddrLen);
   if (sent > 0)
