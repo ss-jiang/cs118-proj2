@@ -197,12 +197,27 @@ int main(int argc, char* argv[])
 	    }
 	    else if (rc > 0)
 	    {
-		    new_file.write(buf, rc);
+	    	char* headers_buf = new char[12]; 
+	    	char mybuffer[512];
+		    for(int i = 0; i < 12; i++) {
+		    	headers_buf[i] = buf[i]; 
+		    }
+		    TCPheader header; 
+	    	int j = 0;
+		    header.parseBuffer(headers_buf);
+
+		    for(int i = 12; i < 524; i++) {
+		    	mybuffer[j] = buf[i];
+		    	j++;
+		    }
+		    new_file.write(mybuffer, rc - 12);
 		    file_size += rc;
 		    memset(buf, 0, sizeof(buf));
 		    std::cout << "File size: " << file_size << std::endl;
 		    new_file.close();
 	    }
+
+	    //int sent = sendto(sockfd, buf, 12, 0, res->ai_addr, res->ai_addrlen);
 	}
 	
 

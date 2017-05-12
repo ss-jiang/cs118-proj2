@@ -57,8 +57,8 @@ void TCPheader::printInfo() {
 	std::cout << "ACK, SYN, FIN Flags: " << flags << std::endl;
 }
 
-unsigned char* TCPheader::toCharBuffer() {
-	unsigned char* buf = new unsigned char[12]; 
+char* TCPheader::toCharBuffer() {
+	char* buf = new char[12]; 
 	std::cout << "UDP Headers" << std::endl;
 	
 	std::cout << "Sequence Number" << std::endl;
@@ -96,7 +96,7 @@ unsigned char* TCPheader::toCharBuffer() {
 	return buf;
 }
 
-void TCPheader::parseBuffer(unsigned char* buf) {
+void TCPheader::parseBuffer(char* buf) {
 	seq_num = ((buf[0] << 24) + (buf[1] << 16) + (buf[2] << 8) + buf[3]);
 	ack_num = ((buf[4] << 24) + (buf[5] << 16) + (buf[6] << 8) + buf[7]);
 	connection_id = ((buf[8] << 8) + buf[9]); 

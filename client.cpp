@@ -90,17 +90,24 @@ int main(int argc, char* argv[])
   // send UDP headers
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   header.printInfo();
-  unsigned char* buf = header.toCharBuffer(); 
+  char* buf = header.toCharBuffer(); 
   TCPheader headers; 
   // reads the buffer and translate it to UDP header
+  char mybuffer[524]; 
+  for(int i = 0; i < 12; i++) {
+    mybuffer[i] = buf[i];
+  }
   headers.parseBuffer(buf); 
-
   while(!open_file.eof())
   {
     open_file.read(read_buffer, 512);
-    strcat((char*) buf, read_buffer);
-
-    int sent = sendto(sockfd, buf, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
+    //strcat((char*) buf, read_buffer);
+    int j = 0; 
+    for(int i = 12; i < 524; i++) {
+      mybuffer[i] = read_buffer[j];
+      j++;
+    }
+    int sent = sendto(sockfd, mybuffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
     if (sent > 0)
     {
       std::cout << "WC: " << sent << std::endl;
@@ -111,6 +118,13 @@ int main(int argc, char* argv[])
       std::cerr << "ERROR: Could not send file\n";
       exit(1); 
     }
+
+    char* str2 = new char[12]; 
+    for(int i = 0; i < 12; i++) {
+      str2[i] = mybuffer[i]; 
+    }
+    TCPheader myheaders; 
+    myheaders.parseBuffer(str2);
   }
   std::cout << "Sent file: " << file_name << std::endl;
   std::cout << "Bytes: " << wc << std::endl;
