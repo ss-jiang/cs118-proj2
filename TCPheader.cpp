@@ -56,3 +56,42 @@ void TCPheader::printInfo() {
 	std::cout << "Connection ID: " << connection_id << std::endl; 
 	std::cout << "ACK, SYN, FIN Flags: " << flags << std::endl;
 }
+
+unsigned char* TCPheader::toCharBuffer() {
+	unsigned char* buf = new unsigned char[12]; 
+	std::cout << "UDP Headers" << std::endl;
+	
+	std::cout << "Sequence Number" << std::endl;
+	buf[0] = (seq_num >> 24) & 0xFF; 
+	buf[1] = (seq_num >> 16) & 0xFF;
+	buf[2] = (seq_num >> 8) & 0xFF; 
+	buf[3] = (seq_num) & 0xFF;
+	printf("%x %x %x %x\n", (unsigned char)buf[0],
+                        (unsigned char)buf[1],
+                        (unsigned char)buf[2],
+                        (unsigned char)buf[3]);
+  	
+  	std::cout << "Acknowledgment Number" << std::endl;
+	buf[4] = (ack_num >> 24) & 0xFF; 
+	buf[5] = (ack_num >> 16) & 0xFF;
+	buf[6] = (ack_num >> 8) & 0xFF; 
+	buf[7] = (ack_num) & 0xFF;
+	printf("%x %x %x %x\n", (unsigned char)buf[4],
+                        (unsigned char)buf[5],
+                        (unsigned char)buf[6],
+                        (unsigned char)buf[7]);
+  	
+  	std::cout << "Connection Id" << std::endl;
+	buf[8] = (connection_id >> 8) & 0xFF; 
+	buf[9] = (connection_id) & 0xFF;
+	printf("%x %x\n", (unsigned char)buf[8],
+                        (unsigned char)buf[9]);
+  	
+
+  	std::cout << "Flags" << std::endl;
+  	buf[10] = (flags.to_ulong() >> 8) & 0xFF; 
+	buf[11] = (flags.to_ulong()) & 0xFF;
+	printf("%x %x\n", (unsigned char)buf[10],
+                        (unsigned char)buf[11]);
+	return buf;
+}

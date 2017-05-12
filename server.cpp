@@ -180,6 +180,12 @@ int main(int argc, char* argv[])
 	int rc = 0;
 	int file_size = 0;
 
+	std::ofstream new_file;
+	new_file.open("example.txt", std::ios::out | std::ios::binary);
+	char receive_buf[1024] = {0};
+	//int file_size = 0;
+	//int rc = 0;
+
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
 	while( (rc = recvfrom(sockfd, buf, sizeof buf, 0, &clientAddr, &clientAddrSize)) > 0)
@@ -189,7 +195,7 @@ int main(int argc, char* argv[])
 			exit(1);
 	    }
 
-	    // new_file.write(receive_buf, rc);
+	    new_file.write(receive_buf, rc);
 	    file_size += rc;
 	    memset(buf, 0, sizeof(buf));
 	}

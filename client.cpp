@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
   std::string ip_addr = argv[1];
   int port_num = atoi(argv[2]);
   std::string file_name = argv[3];
-  
+
   // for timeout
   fd_set myset;
   int valopt;
@@ -125,13 +125,47 @@ int main(int argc, char* argv[])
     std::cerr << "ERROR: Failed to get socket name" << std::endl;
     exit(1);
   }
+
+  inet_pton(AF_INET,ip_addr.c_str(),&clientAddr.sin_addr.s_addr);
+  clientAddr.sin_port=htons(port_num);
+
   // sleep(20);
-  inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-  std::cout << "Set up a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
+  //inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
+  std::cout << "Set up a connection from: " << ip_addr.c_str() << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
   std::ifstream open_file (file_name.c_str(), std::ios::in | std::ios::binary );
-  char in_buffer[1500];
+  char in_buffer[512];
   int wc = 0;
+
+  //build UDP packet
+  std::string src_addr = "127.0.0.1"; 
+  int src_port = 1200; 
+  std::string dest_addr = ip_addr; 
+  int dest_port = port_num; 
+  int cid = 0; 
+  uint32_t seq_num = 12345; 
+  uint32_t ack_num = 0; 
+  bool ack = 0; 
+  bool syn = 1; 
+  bool fin = 0; 
+
+  // send UDP headers
+  TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
+  header.printInfo();
+  unsigned char* buf = header.toCharBuffer(); 
+
+  int sent = sendto(sockfd, buf, 12, 0, (struct sockaddr*)&clientAddr, clientAddrLen);
+  if (sent > 0)
+  {
+    wc += sent;
+  }
+  if (sent == -1)
+  {
+    std::cerr << "ERROR: Could not send file\n";
+    exit(1); 
+  }
+
+  std::cout << "Bytes: " << wc << std::endl;
 
   while(!open_file.eof())
   {
