@@ -71,74 +71,36 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  // UDP has no concept of connection
-  // // TIMEOUT FROM http://developerweb.net/viewtopic.php?id=3196
-  // int cv = connect(sockfd, res->ai_addr, res->ai_addrlen);
-  // if (cv < 0) { 
-  //   if (errno == EINPROGRESS) { 
-  //     while(1) 
-  //     { 
-  //       tv.tv_sec = 10; 
-  //       tv.tv_usec = 0; 
-  //       FD_ZERO(&myset); 
-  //       FD_SET(sockfd, &myset); 
-
-  //       cv = select(sockfd+1, NULL, &myset, NULL, &tv); 
-  //       if (cv < 0 && errno != EINTR) { 
-  //         std::cerr << "ERROR: Error connecting\n";
-  //         exit(1);
-  //       } 
-  //       else if (cv > 0) { 
-  //         // Socket selected for write 
-  //         lon = sizeof(int); 
-  //         if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) { 
-  //           std::cerr << "ERROR: Error in getsockopt()\n";
-  //           exit(1); 
-  //         } 
-  //         if (valopt) { 
-  //           std::cerr << "ERROR: Error in delayed connection()\n"; 
-  //           exit(1); 
-  //         } 
-  //         break; 
-  //       } 
-  //       else 
-  //       { 
-  //         std::cerr << "ERROR: Timeout while connecting\n"; 
-  //         exit(1); 
-  //       } 
-  //     } 
-  //   } 
-  //   else 
-  //   { 
-  //     std::cerr << "ERROR: Error connecting\n";
-  //     exit(1); 
-  //   } 
-  // } 
-  // Set to blocking mode again... 
-  // arg = fcntl(sockfd, F_GETFL, NULL); 
-  // arg &= (~O_NONBLOCK); 
-  // fcntl(sockfd, F_SETFL, arg); 
-
-
-  // struct sockaddr_in clientAddr;
-  // socklen_t clientAddrLen = sizeof(clientAddr);
-  // if (getsockname(sockfd, (struct sockaddr *)&clientAddr, &clientAddrLen) == -1) {
-  //   std::cerr << "ERROR: Failed to get socket name" << std::endl;
-  //   exit(1);
-  // }
-  // // sleep(20);
-  // inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-  // std::cout << "Set up a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
-
   std::ifstream open_file (file_name.c_str(), std::ios::in | std::ios::binary );
-  char in_buffer[1500];
+  char read_buffer[512];
   int wc = 0;
+
+  //build UDP packet
+  std::string src_addr = "127.0.0.1"; 
+  int src_port = 1200; 
+  std::string dest_addr = ip_addr; 
+  int dest_port = port_num; 
+  int cid = 0; 
+  uint32_t seq_num = 12345; 
+  uint32_t ack_num = 0; 
+  bool ack = 0; 
+  bool syn = 1; 
+  bool fin = 0; 
+
+  // send UDP headers
+  TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
+  header.printInfo();
+  unsigned char* buf = header.toCharBuffer(); 
+  TCPheader headers; 
+  // reads the buffer and translate it to UDP header
+  headers.parseBuffer(buf); 
 
   while(!open_file.eof())
   {
-    open_file.read(in_buffer, 512);
+    open_file.read(read_buffer, 512);
+    strcat((char*) buf, read_buffer);
 
-    int sent = sendto(sockfd, in_buffer, open_file.gcount(), 0, res->ai_addr, res->ai_addrlen);
+    int sent = sendto(sockfd, buf, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
     if (sent > 0)
     {
       std::cout << "WC: " << sent << std::endl;
@@ -149,17 +111,6 @@ int main(int argc, char* argv[])
       std::cerr << "ERROR: Could not send file\n";
       exit(1); 
     }
-
-    // int sent = send(sockfd, in_buffer, open_file.gcount(), 0);
-    // if (sent > 0)
-    // {
-    //   wc += sent;
-    // }
-    // if (sent == -1)
-    // {
-    //   std::cerr << "ERROR: Could not send file\n";
-    //   exit(1); 
-    // }
   }
   std::cout << "Sent file: " << file_name << std::endl;
   std::cout << "Bytes: " << wc << std::endl;

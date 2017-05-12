@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <bitset>
+#include <cstdint>
+#include <cstring>
 
 class TCPheader {
 public: 
@@ -23,9 +25,9 @@ public:
 	uint16_t getConnectionId(); 
 	void setConnectionId(uint16_t connectionId); 
 	void printInfo(); 
-
-private: 
 	void setFlags(bool ack, bool syn, bool fin); 
+	unsigned char* toCharBuffer(); 
+	void parseBuffer(unsigned char* buffer); 
 }; 
 
 #endif //TCPheader 
