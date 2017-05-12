@@ -163,7 +163,6 @@ int main(int argc, char* argv[])
 		std::cerr << "ERROR: Failed to bind to socket" << std::endl;
 		exit(-1);
 	}
-
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
 	// if (listen(sockfd, 1) == -1) {
@@ -172,28 +171,40 @@ int main(int argc, char* argv[])
 	// }
 
 	// accept a new connection
-	struct sockaddr clientAddr;
+	struct sockaddr_storage clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
-	int clientSockfd;
+
+	// recvfrom(sock, message, sizeof(message), 0, (struct sockaddr*)&sender, &sendsize);
+
+	// int clientSockfd;
 	int connection_number = 0;
 	char buf[524];
-	int rc = 0;
+
+	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
+	// variables used to open and write to a file
+	std::ofstream new_file;
+	new_file.open(save_name, std::ios::out | std::ios::binary);
 	int file_size = 0;
 
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
-	while( (rc = recvfrom(sockfd, buf, sizeof buf, 0, &clientAddr, &clientAddrSize)) > 0)
-    {
+	while(1)
+	{
+		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 	    if (rc == -1) {
-	    	std::cerr << "ERROR: recv() failed\n";
+	    	std::cerr << "ERROR: recvfrom() failed\n";
 			exit(1);
 	    }
-
-	    // new_file.write(receive_buf, rc);
-	    file_size += rc;
-	    memset(buf, 0, sizeof(buf));
+	    else if (rc > 0)
+	    {
+		    new_file.write(buf, rc);
+		    file_size += rc;
+		    memset(buf, 0, sizeof(buf));
+		    std::cout << "File size: " << file_size << std::endl;
+		    new_file.close();
+	    }
 	}
-
+	
 
 	// while ((clientSockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientAddrSize)) && !SIG_HANDLER_CALLED) 
 	// {

@@ -33,13 +33,13 @@ int main(int argc, char* argv[])
   std::string ip_addr = argv[1];
   int port_num = atoi(argv[2]);
   std::string file_name = argv[3];
-  
+
   // for timeout
-  fd_set myset;
-  int valopt;
-  struct timeval tv;
-  socklen_t lon;
-  long arg; 
+  // fd_set myset;
+  // int valopt;
+  // struct timeval tv;
+  // socklen_t lon;
+  // long arg; 
 
   // Check that the port number is in range
   if (port_num < 1024 || port_num > 65535) {
@@ -47,18 +47,18 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  // create a socket using TCP IP
+    // create a socket using UDP
   int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
   // set non-blocking to check timeout
-  arg = fcntl(sockfd, F_GETFL, NULL); 
-  arg |= O_NONBLOCK; 
-  fcntl(sockfd, F_SETFL, arg); 
+  // arg = fcntl(sockfd, F_GETFL, NULL); 
+  // arg |= O_NONBLOCK; 
+  // fcntl(sockfd, F_SETFL, arg); 
 
   // stuff to get address information and connect
   struct addrinfo hints, *res;
   int status;
-  char ipstr[INET_ADDRSTRLEN] = {'\0'};
+  // char ipstr[INET_ADDRSTRLEN] = {'\0'};
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_flags = AI_PASSIVE; 
@@ -115,19 +115,20 @@ int main(int argc, char* argv[])
   //   } 
   // } 
   // Set to blocking mode again... 
-  arg = fcntl(sockfd, F_GETFL, NULL); 
-  arg &= (~O_NONBLOCK); 
-  fcntl(sockfd, F_SETFL, arg); 
+  // arg = fcntl(sockfd, F_GETFL, NULL); 
+  // arg &= (~O_NONBLOCK); 
+  // fcntl(sockfd, F_SETFL, arg); 
 
-  struct sockaddr_in clientAddr;
-  socklen_t clientAddrLen = sizeof(clientAddr);
-  if (getsockname(sockfd, (struct sockaddr *)&clientAddr, &clientAddrLen) == -1) {
-    std::cerr << "ERROR: Failed to get socket name" << std::endl;
-    exit(1);
-  }
-  // sleep(20);
-  inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-  std::cout << "Set up a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
+
+  // struct sockaddr_in clientAddr;
+  // socklen_t clientAddrLen = sizeof(clientAddr);
+  // if (getsockname(sockfd, (struct sockaddr *)&clientAddr, &clientAddrLen) == -1) {
+  //   std::cerr << "ERROR: Failed to get socket name" << std::endl;
+  //   exit(1);
+  // }
+  // // sleep(20);
+  // inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
+  // std::cout << "Set up a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
 
   std::ifstream open_file (file_name.c_str(), std::ios::in | std::ios::binary );
   char in_buffer[1500];
@@ -137,9 +138,10 @@ int main(int argc, char* argv[])
   {
     open_file.read(in_buffer, 512);
 
-    int sent = sendto(sockfd, in_buffer, 512, 0, (struct sockaddr*)&clientAddr, clientAddrLen);
+    int sent = sendto(sockfd, in_buffer, open_file.gcount(), 0, res->ai_addr, res->ai_addrlen);
     if (sent > 0)
     {
+      std::cout << "WC: " << sent << std::endl;
       wc += sent;
     }
     if (sent == -1)
