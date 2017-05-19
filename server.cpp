@@ -15,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <iostream>
+#include <vector>
 
 #include "TCPheader.h"
 
@@ -95,6 +96,13 @@ void signal_handler(int signum)
 // 	}
 // 	close(clientSockfd);
 // 
+
+struct file_metadata {
+	std::string file_name;
+	// std::ofstream* file_d;
+	int file_size;
+};
+
 int main(int argc, char* argv[])
 {
 	if (argc < 3) {
@@ -164,17 +172,12 @@ int main(int argc, char* argv[])
 	// 	exit(-1);
 	// }
 
+	std::vector<file_metadata> file_des;
+
 	// accept a new connection
 	struct sockaddr_storage clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
-	int connection_number = 0;
 	char buf[524];
-
-	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
-	// variables used to open and write to a file
-	std::ofstream new_file;
-	new_file.open(save_name, std::ios::out | std::ios::binary);
-	int file_size = 0;
 
 	uint32_t server_seq = 4321;
     uint32_t server_ack;
@@ -184,80 +187,103 @@ int main(int argc, char* argv[])
 	while(1)
 	{
 		// receive first part of handshake 
-		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-		
-			// if (rc == -1) 
-		 //    {
-		 //    	std::cerr << "ERROR: recvfrom() failed\n";
-			// 	exit(1);
-		 //    }
+		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);	
+		if (rc == -1) 
+	    {
+	    	std::cerr << "ERROR: recvfrom() failed\n";
+			exit(1);
+	    }
 	    if (rc > 0)
 	    {
-	    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
-		    unsigned char* headers_buf = new unsigned char[12]; 
+	    	// isolate the header bytes from the packet
+	    	unsigned char* headers_buf = new unsigned char[12]; 
 		    for(int i = 0; i < 12; i++) {
 		    	headers_buf[i] = (unsigned char) buf[i]; 
 		    }
+
 		    TCPheader header;
 		    header.parseBuffer(headers_buf);
-		    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
-		    cid++;
 
-		    // responds to receiving a packet from the client
-		    // response headers needs to be set up with the receiver header's ack number
-		    std::cout << ">>>>>>>>> 2nd part of handshake sent" << std::endl;
-		    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
-		    resp_header.printInfo();
+		    // check flags, we need the SYN/ACK/FIN flags and the connection id
+		    std::bitset<16> f = header.getFlags();
+		    uint16_t conn_id = header.getConnectionId();
 
-		    // sending 2nd part of the handshake buffer
-		    unsigned char* resp_buf = resp_header.toCharBuffer(); 
-		    unsigned char hs2_buf[12]; 
-		    for(int i = 0; i < 12; i++) {
-		      hs2_buf[i] = resp_buf[i];
-		    }
-
-		    int sent = 0;
-		    if ( (sent = sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
+		    // received SYN from client 
+		    if (f[1] == 1)
 		    {
-		      if (sent == -1)
-		      {
-		        std::cerr << "ERROR: Could not send response header\n";
-		        exit(1); 
-		      }
-		      else
-		      {
-		      	//std::cout << ">>>>>>>>>>>>> response sent\n";
-		      }
+		    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
+
+			    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
+
+		    	// create new file descriptor for each connection
+	    		std::string save_name = file_dir + "/" + std::to_string(cid) + ".file";
+				std::ofstream new_file;
+
+				file_metadata new_connection_data;
+				new_connection_data.file_size = 0;
+				new_connection_data.file_name = file_dir + "/" + std::to_string(cid) + ".file";
+				// new_file.open(save_name, std::ios::out | std::ios::binary);
+				// new_connection_data.file_d = &new_file;
+
+				file_des.push_back(new_connection_data);
+
+				// increment connection count
+				cid++;
+
+			    // send SYN-ACK to client, responds to receiving a packet from the client
+			    // response headers needs to be set up with the receiver header's ack number
+			    std::cout << ">>>>>>>>> 2nd part of handshake sent" << std::endl;
+			    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
+			    resp_header.printInfo();
+
+			    // sending 2nd part of the handshake buffer
+			    unsigned char* resp_buf = resp_header.toCharBuffer(); 
+			    unsigned char hs2_buf[12]; 
+			    for(int i = 0; i < 12; i++) {
+			      hs2_buf[i] = resp_buf[i];
+			    }
+
+			    int sent = 0;
+			    if ( (sent = sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
+			    {
+			      if (sent == -1)
+			      {
+			        std::cerr << "ERROR: Could not send response header\n";
+			        exit(1); 
+			      }
+			    }
+
 		    }
 
 		    // receiving 3rd part of the handshake, the data begins to be received here
-		    unsigned char hs3_buf[524]; 
-		    if( (rc = recvfrom(sockfd, hs3_buf, sizeof(hs3_buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize)) > 0)
+		    // ACK flag and no SYN flag
+		    if (f[2] == 1 && f[1] == 0 && conn_id > 0)
 		    {
 		    	std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
+
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
-	              headers3_buf[i] = hs3_buf[i]; 
+	              headers3_buf[i] = buf[i]; 
 	            }
+
 			    TCPheader hs3_header; 
 			    hs3_header.parseBuffer(headers3_buf);
 			    char data_buffer[512]; 
 		    	int j = 0; 
 			    for(int i = 12; i < 524; i++) {
-			    	data_buffer[j] = hs3_buf[i];
+			    	data_buffer[j] = buf[i];
 			    	j++;
 			    }
+
+			    std::ofstream new_file;
+			    new_file.open(file_des[conn_id-1].file_name, std::ios::app | std::ios::binary );
+
 			    new_file.write(data_buffer, rc - 12);
-			    file_size += rc;
-			    memset(hs3_buf, 0, sizeof(hs3_buf));
-			    std::cout << "File size: " << file_size << std::endl;
+			    file_des[conn_id-1].file_size += (rc - 12);
+			    memset(buf, 0, sizeof(buf));
+			    std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 			}
-			else if (rc == 0)
-		    {
-		    	std::cout << "File size: " << file_size << std::endl;
-				new_file.close();
-		    }
 
 	    }
 	}

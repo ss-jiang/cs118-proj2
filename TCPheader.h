@@ -26,6 +26,7 @@ public:
 	void setConnectionId(uint16_t connectionId); 
 	void printInfo(); 
 	void setFlags(bool ack, bool syn, bool fin); 
+	std::bitset<16> getFlags();
 	unsigned char* toCharBuffer(); 
 	void parseBuffer(unsigned char* buffer); 
 }; 

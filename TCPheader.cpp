@@ -34,6 +34,10 @@ void TCPheader::setFlags(bool ack, bool syn, bool fin) {
 	}
 }
 
+std::bitset<16> TCPheader::getFlags() {
+	return flags;
+}
+
 uint32_t TCPheader::getAckNum() {
 	return ack_num; 
 }
