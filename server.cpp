@@ -171,9 +171,9 @@ int main(int argc, char* argv[])
 	}
 
 	// set non-blocking
-	long arg = fcntl(sockfd, F_GETFL, NULL); 
-	arg |= O_NONBLOCK; 
-	fcntl(sockfd, F_SETFL, arg); 
+	// long arg = fcntl(sockfd, F_GETFL, NULL); 
+	// arg |= O_NONBLOCK; 
+	// fcntl(sockfd, F_SETFL, arg); 
 
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
@@ -301,6 +301,7 @@ int main(int argc, char* argv[])
 			    std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 
+			    std::cout << ">>>>>>>>> sending ack" << std::endl;
 			    server_ack = hs3_header.getSeqNum() + (rc - 12);
 			    server_seq = hs3_header.getAckNum();
 
@@ -308,7 +309,6 @@ int main(int argc, char* argv[])
 			    resp_header.printInfo();
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
 
-			    std::cout << ">>>>>>>>> sending ack" << std::endl;
 			    // send ACK back to client
 			    if (sendto(sockfd, ack_buf, sizeof(ack_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
@@ -317,25 +317,25 @@ int main(int argc, char* argv[])
 			    }
 			}
 			// FIN flag received
-			if (f[0])
-			{
-				unsigned char* fin_ack_buff = new unsigned char[12]; 
-	            server_seq = 4322; // 0, no ACK flag set
-	            server_ack = header.getSeqNum() + 1;
-	            cid = header.getConnectionId();
+			// if (f[0])
+			// {
+			// 	unsigned char* fin_ack_buff = new unsigned char[12]; 
+	  //           server_seq = 4322; // 0, no ACK flag set
+	  //           server_ack = header.getSeqNum() + 1;
+	  //           cid = header.getConnectionId();
 
-	            fin_connIds.push_back(cid);
+	  //           fin_connIds.push_back(cid);
 
-	            std::cout << ">>>>>>>>>>>>>>> received fin\n";
-	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
-	            fin_ack_buff = fin_ack_header.toCharBuffer();
-	            fin_ack_header.printInfo();
-	            if (sendto(sockfd, fin_ack_buff, sizeof(fin_ack_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
-	            {
-	            	std::cerr << "ERROR: Could not send file\n";
-                  	exit(1);
-	            }
-			}
+	  //           std::cout << ">>>>>>>>>>>>>>> received fin\n";
+	  //           TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
+	  //           fin_ack_buff = fin_ack_header.toCharBuffer();
+	  //           fin_ack_header.printInfo();
+	  //           if (sendto(sockfd, fin_ack_buff, sizeof(fin_ack_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
+	  //           {
+	  //           	std::cerr << "ERROR: Could not send file\n";
+   //                	exit(1);
+	  //           }
+			// }
 	    }
 	}
 
