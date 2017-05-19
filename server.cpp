@@ -103,6 +103,16 @@ struct file_metadata {
 	int file_size;
 };
 
+bool in_fin_vector(std::vector<uint16_t>& in_vector, uint16_t& id)
+{
+	for (unsigned int i = 0; i < in_vector.size(); i++)
+	{
+		if (in_vector[i] == id)
+			return true;
+	}
+	return false;
+}
+
 int main(int argc, char* argv[])
 {
 	if (argc < 3) {
@@ -173,6 +183,7 @@ int main(int argc, char* argv[])
 	// }
 
 	std::vector<file_metadata> file_des;
+	std::vector<uint16_t> fin_connIds;
 
 	// accept a new connection
 	struct sockaddr_storage clientAddr;
@@ -188,11 +199,11 @@ int main(int argc, char* argv[])
 	{
 		// receive first part of handshake 
 		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);	
-		if (rc == -1) 
-	    {
-	    	std::cerr << "ERROR: recvfrom() failed\n";
-			exit(1);
-	    }
+		// if (rc == -1) 
+	 //    {
+	 //    	std::cerr << "ERROR: recvfrom() failed\n";
+		// 	exit(1);
+	 //    }
 	    if (rc > 0)
 	    {
 	    	// isolate the header bytes from the packet
@@ -254,10 +265,15 @@ int main(int argc, char* argv[])
 			    }
 
 		    }
+		    // client sends ACK to server's FIN-ACK
+			if (f[2] && in_fin_vector(fin_connIds, conn_id))
+			{
+				std::cout << "closing connection: " << conn_id << std::endl;
+			}
 
 		    // receiving 3rd part of the handshake, the data begins to be received here
 		    // ACK flag and no SYN flag
-		    if (f[2] == 1 && f[1] == 0 && conn_id > 0)
+		    if (f[2] && !f[1] && conn_id > 0 && !in_fin_vector(fin_connIds, conn_id))
 		    {
 		    	std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
 
@@ -268,6 +284,7 @@ int main(int argc, char* argv[])
 
 			    TCPheader hs3_header; 
 			    hs3_header.parseBuffer(headers3_buf);
+
 			    char data_buffer[512]; 
 		    	int j = 0; 
 			    for(int i = 12; i < 524; i++) {
@@ -283,8 +300,42 @@ int main(int argc, char* argv[])
 			    memset(buf, 0, sizeof(buf));
 			    std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
-			}
 
+			    server_ack = hs3_header.getSeqNum() + (rc - 12);
+			    server_seq = hs3_header.getAckNum();
+
+			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
+			    resp_header.printInfo();
+			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
+
+			    std::cout << ">>>>>>>>> sending ack" << std::endl;
+			    // send ACK back to client
+			    if (sendto(sockfd, ack_buf, sizeof(ack_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+			    {
+			    	std::cerr << "ERROR: Could not send response header\n";
+			    	exit(1);
+			    }
+			}
+			// FIN flag received
+			if (f[0])
+			{
+				unsigned char* fin_ack_buff = new unsigned char[12]; 
+	            server_seq = 4322; // 0, no ACK flag set
+	            server_ack = header.getSeqNum() + 1;
+	            cid = header.getConnectionId();
+
+	            fin_connIds.push_back(cid);
+
+	            std::cout << ">>>>>>>>>>>>>>> received fin\n";
+	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
+	            fin_ack_buff = fin_ack_header.toCharBuffer();
+	            fin_ack_header.printInfo();
+	            if (sendto(sockfd, fin_ack_buff, sizeof(fin_ack_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
+	            {
+	            	std::cerr << "ERROR: Could not send file\n";
+                  	exit(1);
+	            }
+			}
 	    }
 	}
 
