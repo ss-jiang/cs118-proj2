@@ -11,7 +11,7 @@
 #include <fcntl.h> 
 #include <signal.h>
 #include <fstream>
-
+#include <stdint.h>
 #include <string>
 #include <thread>
 #include <iostream>
@@ -102,16 +102,6 @@ int main(int argc, char* argv[])
       	exit(-1);
    	}
 
-   	// uint32_t seqNum = 102; 
-   	// uint32_t ackNum = 161; 
-   	// uint16_t cid = 5; 
-   	// bool ack = true; 
-   	// bool syn = false; 
-   	// bool fin = true; 
-
-   	// TCPheader header(seqNum, ackNum, cid, ack, syn, fin); 
-   	// header.printInfo();
-
    	// Handle signals
    	struct sigaction act;
    	act.sa_handler = &signal_handler;
@@ -181,7 +171,7 @@ int main(int argc, char* argv[])
 	char buf[524];
 
 	// response header
-	char resp_buf[12];
+	// char resp_buf[12];
 
 	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
 	// variables used to open and write to a file
@@ -189,12 +179,14 @@ int main(int argc, char* argv[])
 	new_file.open(save_name, std::ios::out | std::ios::binary);
 	int file_size = 0;
 
-	int a = 11111;
-    int b = 222;
+	uint32_t server_seq = 4321;
+    uint32_t server_ack;
+    uint16_t cid = 0; 
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
 	while(1)
 	{
+		// receive first part of handshake 
 		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 		
 			// if (rc == -1) 
@@ -204,21 +196,22 @@ int main(int argc, char* argv[])
 		 //    }
 	    if (rc > 0)
 	    {
-		    char* headers_buf = new char[12]; 
+	    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
+		    unsigned char* headers_buf = new unsigned char[12]; 
 	    	char data_buffer[512];
 		    for(int i = 0; i < 12; i++) {
-		    	headers_buf[i] = buf[i]; 
+		    	headers_buf[i] = (unsigned char) buf[i]; 
 		    }
 		    TCPheader header; 
 	    	int j = 0;
 		    header.parseBuffer(headers_buf);
-
+		    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
+		    cid++; 
 		    for(int i = 12; i < 524; i++) {
 		    	data_buffer[j] = buf[i];
 		    	j++;
 		    }
 		    new_file.write(data_buffer, rc - 12);
-		    std::cout << data_buffer << std::endl;
 		    file_size += rc;
 		    memset(buf, 0, sizeof(buf));
 		    std::cout << "File size: " << file_size << std::endl;
@@ -226,10 +219,19 @@ int main(int argc, char* argv[])
 
 		    // responds to receiving a packet from the client
 		    // response headers needs to be set up with the receiver header's ack number
-		    TCPheader resp_header(a, b, 1, 1, 0, 0);
+		    std::cout << ">>>>>>>>> 2nd part of handshake sent" << std::endl;
+		    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
+		    resp_header.printInfo();
+
+		    // sending 2nd part of the handshake buffer
+		    unsigned char* resp_buf = resp_header.toCharBuffer(); 
+		    unsigned char hs2_buf[12]; 
+		    for(int i = 0; i < 12; i++) {
+		      hs2_buf[i] = resp_buf[i];
+		    }
 
 		    int sent = 0;
-		    if ( (sent = sendto(sockfd, resp_header.toCharBuffer(), sizeof(resp_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
+		    if ( (sent = sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
 		    {
 		      if (sent == -1)
 		      {
@@ -238,11 +240,23 @@ int main(int argc, char* argv[])
 		      }
 		      else
 		      {
-		      	std::cout << ">>>>>>>>>>>>> response sent\n";
-		      	a++;
-		      	b++;
+		      	//std::cout << ">>>>>>>>>>>>> response sent\n";
 		      }
 		    }
+
+		    // receiving 3rd part of the handshake, the data begins to be received here
+		    unsigned char hs3_buf[524]; 
+		    if( (rc = recvfrom(sockfd, hs3_buf, sizeof(hs3_buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize)) > 0)
+		    {
+		    	std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
+	            unsigned char* headers3_buf = new unsigned char[12]; 
+	            for(int i = 0; i < 12; i++) {
+	              headers3_buf[i] = hs3_buf[i]; 
+	            }
+			    TCPheader hs3_header; 
+			    hs3_header.parseBuffer(headers3_buf);
+			}
+
 	    }
 	    else if (rc == 0)
 	    {

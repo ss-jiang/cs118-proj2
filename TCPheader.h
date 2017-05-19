@@ -26,8 +26,8 @@ public:
 	void setConnectionId(uint16_t connectionId); 
 	void printInfo(); 
 	void setFlags(bool ack, bool syn, bool fin); 
-	char* toCharBuffer(); 
-	void parseBuffer(char* buffer); 
+	unsigned char* toCharBuffer(); 
+	void parseBuffer(unsigned char* buffer); 
 }; 
 
 #endif //TCPheader 

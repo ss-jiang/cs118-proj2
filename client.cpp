@@ -11,7 +11,7 @@
 
 #include <stdlib.h>
 #include <fcntl.h>
-
+#include <stdint.h>
 #include <string>
 #include <thread>
 #include <iostream>
@@ -76,16 +76,15 @@ int main(int argc, char* argv[])
   char read_buffer[512];
   int wc = 0;
 
-  // buffer to receive from server
-  char recv_buffer[12];
-  struct sockaddr_storage clientAddr;
-  socklen_t clientAddrSize = sizeof(clientAddr);
+
+  // struct sockaddr_storage clientAddr;
+  // socklen_t clientAddrSize = sizeof(clientAddr);
 
   //build UDP packet
   std::string src_addr = "127.0.0.1"; 
-  int src_port = 1200; 
+  // int src_port = 1200; 
   std::string dest_addr = ip_addr; 
-  int dest_port = port_num; 
+  // int dest_port = port_num; 
   int cid = 0; 
   uint32_t seq_num = 12345; 
   uint32_t ack_num = 0; 
@@ -94,18 +93,18 @@ int main(int argc, char* argv[])
   bool fin = 0; 
 
   // send UDP headers
+  std::cout << ">>>>>>>>>>> 1st part of handshake sent" << std::endl;
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   header.printInfo();
-  char* buf = header.toCharBuffer(); 
-  TCPheader headers; 
+  unsigned char* buf = header.toCharBuffer(); 
   // reads the buffer and translate it to UDP header
   char packet_buffer[524]; 
   for(int i = 0; i < 12; i++) {
     packet_buffer[i] = buf[i];
   }
-  headers.parseBuffer(buf); 
 
-
+  // buffer to receive from server
+  unsigned char recv_buffer[12];
   // int sent = 0;
   int recv = 0;
   while(!open_file.eof())
@@ -129,10 +128,28 @@ int main(int argc, char* argv[])
       {
         if (recv > 0)
         {
-          std::cout << ">>>>>>>>>>>>> Response received\n";
+          std::cout << ">>>>>>>>>>>>> 2nd Response received\n";
+          unsigned char* headers_buf = new unsigned char[12]; 
+          for(int i = 0; i < 12; i++) {
+            headers_buf[i] = recv_buffer[i]; 
+          }
           TCPheader recv_header;
-          recv_header.parseBuffer((char*) recv_buffer);
-          recv_header.printInfo();
+          recv_header.parseBuffer(headers_buf);
+          //recv_header.printInfo();
+
+          std::cout << ">>>>>>>>>>>>> 3rd part of handshake sent" << std::endl;
+          unsigned char* hs3_buff = new unsigned char[12]; 
+          seq_num = recv_header.getAckNum();
+          ack_num = recv_header.getSeqNum() + 1; // 1 for now, it needs to be 1 + however much payload we have
+          cid = recv_header.getConnectionId();
+          TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0); 
+          hs3_buff = hs3_header.toCharBuffer();
+          hs3_header.printInfo();
+          unsigned char hs3_buffer[12]; 
+          for(int i = 0; i < 12; i++) {
+             hs3_buffer[i] = hs3_buff[i];
+          } 
+          sent = sendto(sockfd, hs3_buffer, sizeof(hs3_buffer), 0, res->ai_addr, res->ai_addrlen);
         }
       }
     }
@@ -145,10 +162,10 @@ int main(int argc, char* argv[])
     // send fin packet when done sending the file
     if (open_file.eof())
     {
-      std::cout << ">>>>>>>>>>>>>>> sending fin\n";
-      TCPheader fin_header(99999, 888, 1, 0, 0, 1);
-      fin_header.printInfo();
-      sendto(sockfd, fin_header.toCharBuffer(), 12, 0, res->ai_addr, res->ai_addrlen);
+      // std::cout << ">>>>>>>>>>>>>>> sending fin\n";
+      // TCPheader fin_header(99999, 888, 1, 0, 0, 1);
+      // fin_header.printInfo();
+      // sendto(sockfd, fin_header.toCharBuffer(), 12, 0, res->ai_addr, res->ai_addrlen);
     }
   }
   std::cout << "Sent file: " << file_name << std::endl;
