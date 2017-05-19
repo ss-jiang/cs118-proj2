@@ -106,8 +106,8 @@ void TCPheader::parseBuffer(unsigned char* buf) {
 	connection_id = ((buf[8] << 8) + buf[9]); 
 	flags = ((buf[10] << 8) + buf[11]);
 
-	std::cout << seq_num << std::endl;
-	std::cout << ack_num << std::endl;
-	std::cout << connection_id << std::endl;
-	std::cout << flags << std::endl;
+	// std::cout << seq_num << std::endl;
+	// std::cout << ack_num << std::endl;
+	// std::cout << connection_id << std::endl;
+	// std::cout << flags << std::endl;
 }

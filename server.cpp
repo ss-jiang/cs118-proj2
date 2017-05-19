@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
 
 			    // send SYN-ACK to client, responds to receiving a packet from the client
 			    // response headers needs to be set up with the receiver header's ack number
-			    std::cout << ">>>>>>>>> 2nd part of handshake sent" << std::endl;
+			    std::cout << "<<<<<<<<<<<<< 2nd part of handshake sent" << std::endl;
 			    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
 			    resp_header.printInfo();
 
@@ -275,8 +275,8 @@ int main(int argc, char* argv[])
 		    // ACK flag and no SYN flag
 		    if (f[2] && !f[1] && conn_id > 0 && !in_fin_vector(fin_connIds, conn_id))
 		    {
-		    	std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
-
+		    	//std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
+		    	std::cout << ">>>>>>>>>> received ack\n";
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
 	              headers3_buf[i] = buf[i]; 
@@ -308,7 +308,7 @@ int main(int argc, char* argv[])
 			    resp_header.printInfo();
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
 
-			    std::cout << ">>>>>>>>> sending ack" << std::endl;
+			    std::cout << "<<<<<<<<<<<< sending ack" << std::endl;
 			    // send ACK back to client
 			    if (sendto(sockfd, ack_buf, sizeof(ack_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
@@ -319,6 +319,7 @@ int main(int argc, char* argv[])
 			// FIN flag received
 			if (f[0])
 			{
+				std::cout << "check\n";
 				unsigned char* fin_ack_buff = new unsigned char[12]; 
 	            server_seq = 4322; // 0, no ACK flag set
 	            server_ack = header.getSeqNum() + 1;
@@ -330,11 +331,14 @@ int main(int argc, char* argv[])
 	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
 	            fin_ack_buff = fin_ack_header.toCharBuffer();
 	            fin_ack_header.printInfo();
+
+	            std::cout << "<<<<<<<<<<< sending fin-ack\n";
 	            if (sendto(sockfd, fin_ack_buff, sizeof(fin_ack_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
 	            {
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
+	            exit(1);
 			}
 	    }
 	}
