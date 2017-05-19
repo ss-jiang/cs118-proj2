@@ -73,7 +73,6 @@ int main(int argc, char* argv[])
 
   // buffer to send out to server
   std::ifstream open_file (file_name.c_str(), std::ios::in | std::ios::binary );
-  char read_buffer[512];
   int wc = 0;
 
 
@@ -92,82 +91,84 @@ int main(int argc, char* argv[])
   bool syn = 1; 
   bool fin = 0; 
 
-  // send UDP headers
+  int recv = 0;
+
   std::cout << ">>>>>>>>>>> 1st part of handshake sent" << std::endl;
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   header.printInfo();
   unsigned char* buf = header.toCharBuffer(); 
-  // reads the buffer and translate it to UDP header
-  char packet_buffer[524]; 
+  unsigned char hs1_buf[12]; 
   for(int i = 0; i < 12; i++) {
-    packet_buffer[i] = buf[i];
+    hs1_buf[i] = buf[i];
   }
 
-  // buffer to receive from server
-  unsigned char recv_buffer[12];
-  // int sent = 0;
-  int recv = 0;
-  while(!open_file.eof())
+  int sent = sendto(sockfd, hs1_buf, sizeof(hs1_buf), 0, res->ai_addr, res->ai_addrlen);
+
+  if (sent > 0)
   {
-    // reading the file
-    open_file.read(read_buffer, 512);
- 
-    // adding headers to packet
-    int j = 0;
-    for(int i = 12; i < 524; i++) {
-      packet_buffer[i] = read_buffer[j];
-      j++;
-    }
-
-    int sent = sendto(sockfd, packet_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen);
-    if (sent > 0)
+    // buffer to receive from server
+    unsigned char recv_buffer[12];
+    if ((recv = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, res->ai_addr, &res->ai_addrlen) > 0))
     {
-      wc += sent;
-
-      if ((recv = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, res->ai_addr, &res->ai_addrlen) > 0))
+      if (recv > 0)
       {
-        if (recv > 0)
-        {
-          std::cout << ">>>>>>>>>>>>> 2nd Response received\n";
-          unsigned char* headers_buf = new unsigned char[12]; 
-          for(int i = 0; i < 12; i++) {
-            headers_buf[i] = recv_buffer[i]; 
-          }
-          TCPheader recv_header;
-          recv_header.parseBuffer(headers_buf);
-          //recv_header.printInfo();
+        std::cout << ">>>>>>>>>>>>> 2nd Response received\n";
+        unsigned char* headers_buf = new unsigned char[12]; 
+        for(int i = 0; i < 12; i++) {
+          headers_buf[i] = recv_buffer[i]; 
+        }
+        TCPheader recv_header;
+        recv_header.parseBuffer(headers_buf);
+        //recv_header.printInfo();
 
-          std::cout << ">>>>>>>>>>>>> 3rd part of handshake sent" << std::endl;
-          unsigned char* hs3_buff = new unsigned char[12]; 
-          seq_num = recv_header.getAckNum();
-          ack_num = recv_header.getSeqNum() + 1; // 1 for now, it needs to be 1 + however much payload we have
-          cid = recv_header.getConnectionId();
-          TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0); 
-          hs3_buff = hs3_header.toCharBuffer();
-          hs3_header.printInfo();
-          unsigned char hs3_buffer[12]; 
+
+        std::cout << ">>>>>>>>>>>>> 3rd part of handshake sent" << std::endl;
+        unsigned char* hs3_buff = new unsigned char[12]; 
+        seq_num = recv_header.getAckNum();
+        ack_num = recv_header.getSeqNum() + 1; // 1 for now, it needs to be 1 + however much payload we have
+        cid = recv_header.getConnectionId();
+        TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0); 
+        hs3_buff = hs3_header.toCharBuffer();
+        hs3_header.printInfo();
+        while(!open_file.eof())
+        {
+          char read_buffer[512];
+          unsigned char hs3_buffer[524]; 
           for(int i = 0; i < 12; i++) {
              hs3_buffer[i] = hs3_buff[i];
-          } 
-          sent = sendto(sockfd, hs3_buffer, sizeof(hs3_buffer), 0, res->ai_addr, res->ai_addrlen);
+          }  
+          // reading the file
+          open_file.read(read_buffer, 512);
+       
+          // adding data to packet
+          int j = 0;
+          for(int i = 12; i < 524; i++) {
+            hs3_buffer[i] = read_buffer[j];
+            j++;
+          }
+
+          sent = sendto(sockfd, hs3_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen); 
+          if(sent > 0) {
+            wc += sent;
+          }
+          else {
+            std::cerr << "ERROR: Could not send file\n";
+            exit(1); 
+          }
+          // send fin packet when done sending the file
+          if (open_file.eof())
+          {
+            // std::cout << ">>>>>>>>>>>>>>> sending fin\n";
+            // TCPheader fin_header(99999, 888, 1, 0, 0, 1);
+            // fin_header.printInfo();
+            // sendto(sockfd, fin_header.toCharBuffer(), 12, 0, res->ai_addr, res->ai_addrlen);
+          }
+
         }
       }
     }
-    if (sent == -1)
-    {
-      std::cerr << "ERROR: Could not send file\n";
-      exit(1); 
-    }
-
-    // send fin packet when done sending the file
-    if (open_file.eof())
-    {
-      // std::cout << ">>>>>>>>>>>>>>> sending fin\n";
-      // TCPheader fin_header(99999, 888, 1, 0, 0, 1);
-      // fin_header.printInfo();
-      // sendto(sockfd, fin_header.toCharBuffer(), 12, 0, res->ai_addr, res->ai_addrlen);
-    }
   }
+  
   std::cout << "Sent file: " << file_name << std::endl;
   std::cout << "Bytes: " << wc << std::endl;
 

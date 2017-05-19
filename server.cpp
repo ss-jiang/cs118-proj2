@@ -170,9 +170,6 @@ int main(int argc, char* argv[])
 	int connection_number = 0;
 	char buf[524];
 
-	// response header
-	// char resp_buf[12];
-
 	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
 	// variables used to open and write to a file
 	std::ofstream new_file;
@@ -198,24 +195,13 @@ int main(int argc, char* argv[])
 	    {
 	    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
 		    unsigned char* headers_buf = new unsigned char[12]; 
-	    	char data_buffer[512];
 		    for(int i = 0; i < 12; i++) {
 		    	headers_buf[i] = (unsigned char) buf[i]; 
 		    }
-		    TCPheader header; 
-	    	int j = 0;
+		    TCPheader header;
 		    header.parseBuffer(headers_buf);
 		    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
-		    cid++; 
-		    for(int i = 12; i < 524; i++) {
-		    	data_buffer[j] = buf[i];
-		    	j++;
-		    }
-		    new_file.write(data_buffer, rc - 12);
-		    file_size += rc;
-		    memset(buf, 0, sizeof(buf));
-		    std::cout << "File size: " << file_size << std::endl;
-		    new_file.close();
+		    cid++;
 
 		    // responds to receiving a packet from the client
 		    // response headers needs to be set up with the receiver header's ack number
@@ -255,13 +241,24 @@ int main(int argc, char* argv[])
 	            }
 			    TCPheader hs3_header; 
 			    hs3_header.parseBuffer(headers3_buf);
+			    char data_buffer[512]; 
+		    	int j = 0; 
+			    for(int i = 12; i < 524; i++) {
+			    	data_buffer[j] = hs3_buf[i];
+			    	j++;
+			    }
+			    new_file.write(data_buffer, rc - 12);
+			    file_size += rc;
+			    memset(hs3_buf, 0, sizeof(hs3_buf));
+			    std::cout << "File size: " << file_size << std::endl;
+			    new_file.close();
 			}
+			else if (rc == 0)
+		    {
+		    	std::cout << "File size: " << file_size << std::endl;
+				new_file.close();
+		    }
 
-	    }
-	    else if (rc == 0)
-	    {
-	    	std::cout << "File size: " << file_size << std::endl;
-			new_file.close();
 	    }
 	}
 
