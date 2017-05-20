@@ -31,6 +31,26 @@ void signal_handler(int signum)
 	exit(0);
 }
 
+void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, int cwd, int ss_thresh, std::bitset<16> fl) {
+  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh << " ";
+  if (fl[2]) {
+    std::cout << "ACK";
+    if(fl[1] || fl[0]) {
+      std::cout << " "; 
+    }
+  }
+  if(fl[1]) {
+    std::cout << "SYN";
+    if(fl[0]) {
+      std::cout << " ";
+    } 
+  }
+  if(fl[0]) {
+    std::cout << "FIN"; 
+  }
+  std::cout << "\n"; 
+}
+
 // void handle_thread(struct sockaddr_in clientAddr, int clientSockfd, int connection_number, std::string file_dir)
 // {
 // 	char ipstr[INET_ADDRSTRLEN] = {'\0'};
@@ -184,7 +204,8 @@ int main(int argc, char* argv[])
 
 	std::vector<file_metadata> file_des;
 	std::vector<uint16_t> fin_connIds;
-
+	int cwd = 1; 
+	int ss_thresh = 512;
 	// accept a new connection
 	struct sockaddr_storage clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
@@ -198,7 +219,7 @@ int main(int argc, char* argv[])
 	while(1)
 	{
 		// receive first part of handshake 
-		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);	
+		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 		// if (rc == -1) 
 	 //    {
 	 //    	std::cerr << "ERROR: recvfrom() failed\n";
@@ -214,17 +235,14 @@ int main(int argc, char* argv[])
 
 		    TCPheader header;
 		    header.parseBuffer(headers_buf);
-
+		    printStatement("RECV", header.getSeqNum(), header.getAckNum(), header.getConnectionId(), cwd, ss_thresh, header.getFlags());	
 		    // check flags, we need the SYN/ACK/FIN flags and the connection id
 		    std::bitset<16> f = header.getFlags();
 		    uint16_t conn_id = header.getConnectionId();
-		    // std::cout << f << std::endl;
 
 		    // received SYN from client 
 		    if (f[1] == 1)
 		    {
-		    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
-
 			    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
 
 		    	// create new file descriptor for each connection
@@ -244,9 +262,7 @@ int main(int argc, char* argv[])
 
 			    // send SYN-ACK to client, responds to receiving a packet from the client
 			    // response headers needs to be set up with the receiver header's ack number
-			    std::cout << "<<<<<<<<<<<<< 2nd part of handshake sent" << std::endl;
 			    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
-			    resp_header.printInfo();
 
 			    // sending 2nd part of the handshake buffer
 			    unsigned char* resp_buf = resp_header.toCharBuffer(); 
@@ -255,6 +271,7 @@ int main(int argc, char* argv[])
 			      	hs2_buf[i] = resp_buf[i];
 			    }
 
+			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags());	
 			    if (sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
 			    	std::cerr << "ERROR: Could not send response header\n";
@@ -265,15 +282,13 @@ int main(int argc, char* argv[])
 		    // client sends ACK to server's FIN-ACK
 			if (f[2] && in_fin_vector(fin_connIds, conn_id))
 			{
-				std::cout << "closing connection: " << conn_id << std::endl;
+				//std::cout << "closing connection: " << conn_id << std::endl;
 			}
 
 		    // receiving 3rd part of the handshake, the data begins to be received here
 		    // ACK flag and no SYN flag
 		    if (f[2] && !f[1] && conn_id > 0 && !in_fin_vector(fin_connIds, conn_id))
 		    {
-		    	//std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
-		    	std::cout << ">>>>>>>>>> received ack\n";
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
 	              headers3_buf[i] = buf[i]; 
@@ -295,20 +310,20 @@ int main(int argc, char* argv[])
 			    new_file.write(data_buffer, rc - 12);
 			    file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
-			    std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
+			    //std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 
-			    std::cout << ">>>>>>>>> sending ack" << std::endl;
 			    server_ack = hs3_header.getSeqNum() + (rc - 12);
 			    server_seq = hs3_header.getAckNum();
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
-			    resp_header.printInfo();
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
 	            unsigned char ack_buffer[12]; 
 	            for(int i = 0; i < 12; i++) {
 	            	ack_buffer[i] = ack_buf[i];
 	            }
+
+			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags());	
 
 			    // send ACK back to client
 			    if (sendto(sockfd, ack_buffer, sizeof(ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
@@ -328,7 +343,6 @@ int main(int argc, char* argv[])
 
 	            fin_connIds.push_back(cid);
 
-	            std::cout << ">>>>>>>>>>>>>>> received fin\n";
 	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
 	            fin_ack_buff = fin_ack_header.toCharBuffer();
 
@@ -336,9 +350,8 @@ int main(int argc, char* argv[])
 	            for(int i = 0; i < 12; i++) {
 	            	fin_buf[i] = fin_ack_buff[i];
 	            }
-	            fin_ack_header.printInfo();
 
-	            std::cout << "<<<<<<<<<<< sending fin-ack\n";
+	            printStatement("SEND", fin_ack_header.getSeqNum(), fin_ack_header.getAckNum(), fin_ack_header.getConnectionId(), cwd, ss_thresh, fin_ack_header.getFlags());	
 	            if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 	            {
 	            	std::cerr << "ERROR: Could not send file\n";
