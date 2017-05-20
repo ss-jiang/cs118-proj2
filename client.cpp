@@ -94,7 +94,8 @@ int main(int argc, char* argv[])
   bool syn = 1; 
   bool fin = 0; 
 
-  int recv = 0;
+  // buffer to receive from server
+  unsigned char recv_buffer[12];
 
   std::cout << "<<<<<<<<<<<<< 1st part of handshake sent" << std::endl;
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
@@ -109,10 +110,9 @@ int main(int argc, char* argv[])
 
   if (sent > 0)
   {
-    // buffer to receive from server
-    unsigned char recv_buffer[12];
-    while ((recv = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, res->ai_addr, &res->ai_addrlen) > 0))
+    while (1)
     {
+      int recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
       if (recv > 0)
       {
        
@@ -122,10 +122,11 @@ int main(int argc, char* argv[])
         }
         TCPheader recv_header;
         recv_header.parseBuffer(headers_buf);
-        //recv_header.printInfo();
+        recv_header.printInfo();
 
         // check flags, we need the SYN/ACK/FIN flags and the connection id
         std::bitset<16> f = recv_header.getFlags();
+        std::cout << f << std::endl;
 
         // received SYN-ACK from server
         if (f[2] && f[1] && !syn_ack_established)
@@ -149,8 +150,12 @@ int main(int argc, char* argv[])
 
           // change fin_sent flag
           fin_sent = true;
+          unsigned char fin_buffer[12]; 
+          for(int i = 0; i < 12; i++) {
+              fin_buffer[i] = fin_buff[i];
+          }
 
-          if (sendto(sockfd, fin_buff, 12, 0, res->ai_addr, res->ai_addrlen) < 0)
+          if (sendto(sockfd, fin_buffer, sizeof(fin_buffer), 0, res->ai_addr, res->ai_addrlen) < 0)
           {
             std::cerr << "ERROR: Could not send file\n";
             exit(1); 
@@ -173,7 +178,8 @@ int main(int argc, char* argv[])
           unsigned char hs3_buffer[524]; 
           for(int i = 0; i < 12; i++) {
              hs3_buffer[i] = hs3_buff[i];
-          }  
+          }
+          delete(hs3_buff);  
 
           // reading the file with offset
           open_file.seekg(read_offset);
@@ -197,7 +203,7 @@ int main(int argc, char* argv[])
           }
         }
         // received FIN-ACK from server
-        if (f[1] && f[0])
+        if (f[2] && f[0])
         {
           unsigned char* close_conn_buff = new unsigned char[12]; 
           seq_num = recv_header.getAckNum();
@@ -208,12 +214,21 @@ int main(int argc, char* argv[])
           TCPheader fin_header(seq_num, ack_num, cid, 0, 0, 1);
           close_conn_buff = fin_header.toCharBuffer();
           fin_header.printInfo();
-          if (sendto(sockfd, close_conn_buff, sizeof(close_conn_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
+
+          unsigned char close_conn_buffer[12]; 
+          for(int i = 0; i < 12; i++) {
+              close_conn_buffer[i] = close_conn_buff[i];
+          }
+          delete(close_conn_buff);
+
+          if (sendto(sockfd, close_conn_buffer, sizeof(close_conn_buffer), 0, res->ai_addr, res->ai_addrlen) < 0)
           {
             std::cerr << "ERROR: Could not send file\n";
             exit(1); 
           }
+          break;
         }
+        delete(headers_buf);
       }
     }
   }

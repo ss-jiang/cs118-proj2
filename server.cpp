@@ -218,6 +218,7 @@ int main(int argc, char* argv[])
 		    // check flags, we need the SYN/ACK/FIN flags and the connection id
 		    std::bitset<16> f = header.getFlags();
 		    uint16_t conn_id = header.getConnectionId();
+		    std::cout << f << std::endl;
 
 		    // received SYN from client 
 		    if (f[1] == 1)
@@ -251,17 +252,13 @@ int main(int argc, char* argv[])
 			    unsigned char* resp_buf = resp_header.toCharBuffer(); 
 			    unsigned char hs2_buf[12]; 
 			    for(int i = 0; i < 12; i++) {
-			      hs2_buf[i] = resp_buf[i];
+			      	hs2_buf[i] = resp_buf[i];
 			    }
 
-			    int sent = 0;
-			    if ( (sent = sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) > 0))
+			    if (sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
-			      if (sent == -1)
-			      {
-			        std::cerr << "ERROR: Could not send response header\n";
+			    	std::cerr << "ERROR: Could not send response header\n";
 			        exit(1); 
-			      }
 			    }
 
 		    }
@@ -304,9 +301,9 @@ int main(int argc, char* argv[])
 			    server_ack = hs3_header.getSeqNum() + (rc - 12);
 			    server_seq = hs3_header.getAckNum();
 
-			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
-			    resp_header.printInfo();
-			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
+			    TCPheader ack_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
+			    ack_header.printInfo();
+			    unsigned char* ack_buf = ack_header.toCharBuffer(); 
 
 			    std::cout << "<<<<<<<<<<<< sending ack" << std::endl;
 			    // send ACK back to client
@@ -315,11 +312,11 @@ int main(int argc, char* argv[])
 			    	std::cerr << "ERROR: Could not send response header\n";
 			    	exit(1);
 			    }
+			    delete(headers3_buf);
 			}
 			// FIN flag received
 			if (f[0])
 			{
-				std::cout << "check\n";
 				unsigned char* fin_ack_buff = new unsigned char[12]; 
 	            server_seq = 4322; // 0, no ACK flag set
 	            server_ack = header.getSeqNum() + 1;
@@ -330,16 +327,23 @@ int main(int argc, char* argv[])
 	            std::cout << ">>>>>>>>>>>>>>> received fin\n";
 	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
 	            fin_ack_buff = fin_ack_header.toCharBuffer();
+
+	            unsigned char fin_ack_buffer[12]; 
+			    for(int i = 0; i < 12; i++) {
+			      	fin_ack_buffer[i] = fin_ack_buff[i];
+			    }
+			    delete(fin_ack_buff);
+
 	            fin_ack_header.printInfo();
 
 	            std::cout << "<<<<<<<<<<< sending fin-ack\n";
-	            if (sendto(sockfd, fin_ack_buff, sizeof(fin_ack_buff), 0, res->ai_addr, res->ai_addrlen) < 0)
+	            if (sendto(sockfd, fin_ack_buffer, sizeof(fin_ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 	            {
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
-	            exit(1);
 			}
+			delete(headers_buf);
 	    }
 	}
 
