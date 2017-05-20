@@ -223,6 +223,7 @@ int main(int argc, char* argv[])
               break;
             } 
             else if (rv > 0){ // During the wait, respond to each incoming FIN with an ACK packet; drop any other non-FIN packet.
+              printStatement("RECV", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), cwd, ss_thresh, f);
               unsigned char* wait_buf = new unsigned char[12]; 
               for(int i = 0; i < 12; i++) {
                 wait_buf[i] = recv_buffer[i]; 
