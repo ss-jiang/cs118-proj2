@@ -171,9 +171,9 @@ int main(int argc, char* argv[])
 	}
 
 	// set non-blocking
-	long arg = fcntl(sockfd, F_GETFL, NULL); 
-	arg |= O_NONBLOCK; 
-	fcntl(sockfd, F_SETFL, arg); 
+	// long arg = fcntl(sockfd, F_GETFL, NULL); 
+	// arg |= O_NONBLOCK; 
+	// fcntl(sockfd, F_SETFL, arg); 
 
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
 		    // check flags, we need the SYN/ACK/FIN flags and the connection id
 		    std::bitset<16> f = header.getFlags();
 		    uint16_t conn_id = header.getConnectionId();
-		    std::cout << f << std::endl;
+		    // std::cout << f << std::endl;
 
 		    // received SYN from client 
 		    if (f[1] == 1)
@@ -298,16 +298,20 @@ int main(int argc, char* argv[])
 			    std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 
+			    std::cout << ">>>>>>>>> sending ack" << std::endl;
 			    server_ack = hs3_header.getSeqNum() + (rc - 12);
 			    server_seq = hs3_header.getAckNum();
 
-			    TCPheader ack_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
-			    ack_header.printInfo();
-			    unsigned char* ack_buf = ack_header.toCharBuffer(); 
+			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
+			    resp_header.printInfo();
+			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
+	            unsigned char ack_buffer[12]; 
+	            for(int i = 0; i < 12; i++) {
+	            	ack_buffer[i] = ack_buf[i];
+	            }
 
-			    std::cout << "<<<<<<<<<<<< sending ack" << std::endl;
 			    // send ACK back to client
-			    if (sendto(sockfd, ack_buf, sizeof(ack_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+			    if (sendto(sockfd, ack_buffer, sizeof(ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
 			    	std::cerr << "ERROR: Could not send response header\n";
 			    	exit(1);
@@ -328,20 +332,19 @@ int main(int argc, char* argv[])
 	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
 	            fin_ack_buff = fin_ack_header.toCharBuffer();
 
-	            unsigned char fin_ack_buffer[12]; 
-			    for(int i = 0; i < 12; i++) {
-			      	fin_ack_buffer[i] = fin_ack_buff[i];
-			    }
-			    delete(fin_ack_buff);
-
+	            unsigned char fin_buf[12]; 
+	            for(int i = 0; i < 12; i++) {
+	            	fin_buf[i] = fin_ack_buff[i];
+	            }
 	            fin_ack_header.printInfo();
 
 	            std::cout << "<<<<<<<<<<< sending fin-ack\n";
-	            if (sendto(sockfd, fin_ack_buffer, sizeof(fin_ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+	            if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 	            {
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
+	           	delete(fin_ack_buff);
 			}
 			delete(headers_buf);
 	    }
