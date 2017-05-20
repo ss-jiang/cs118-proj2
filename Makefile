@@ -1,7 +1,7 @@
 CXX=g++
 CXXOPTIMIZE= -O2
 CXXFLAGS= -g -Wall -pthread -std=c++11 $(CXXOPTIMIZE)
-USERID=304410695
+USERID=304410695_104473226
 CLASSES= TCPheader.cpp
 
 all: server client
@@ -17,4 +17,5 @@ clean:
 
 dist: tarball
 tarball: clean
-	tar -cvzf /tmp/$(USERID).tar.gz --exclude=./.vagrant . --exclude=./*.txt  --exclude=./upload_test && mv /tmp/$(USERID).tar.gz .
+	tar -cvzf /tmp/$(USERID).tar.gz --exclude=./.vagrant . --exclude=./*.txt --exclude=./cs118_proj2_sample_client_server --exclude=./upload_test && mv /tmp/$(USERID).tar.gz .
+

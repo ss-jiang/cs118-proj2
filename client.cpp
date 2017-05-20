@@ -22,6 +22,7 @@
 #include "TCPheader.h"
 
 #define MAX_PATH_LENGTH        4096
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
 {
@@ -154,6 +155,7 @@ int main(int argc, char* argv[])
   }
 
   std::bitset<16> fl = header.getFlags();
+
   printStatement("SEND", seq_num, ack_num, cid, cwd, ss_thresh, fl);
 
   int sent = sendto(sockfd, hs1_buf, sizeof(hs1_buf), 0, res->ai_addr, res->ai_addrlen);
@@ -351,7 +353,7 @@ int main(int argc, char* argv[])
           // }
         }
         // received FIN-ACK from server
-        if (f[2] && f[0])
+        if ((f[2] && f[0]) || f[0])
         {
           // std::cout << "here" << std::endl;
           // // set non-blocking
