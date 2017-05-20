@@ -11,7 +11,7 @@ public:
 	uint32_t seq_num; 
 	uint32_t ack_num; 
 	uint16_t connection_id; 
-	std::bitset<16> flags; 
+	uint16_t flags; 
 	bool ACK_FLAG = 0; 
 	bool FIN_FLAG = 0; 
 	bool SYN_FLAG = 0; 
@@ -26,7 +26,7 @@ public:
 	void setConnectionId(uint16_t connectionId); 
 	void printInfo(); 
 	void setFlags(bool ack, bool syn, bool fin); 
-	std::bitset<16> getFlags();
+	uint16_t getFlags();
 	unsigned char* toCharBuffer(); 
 	void parseBuffer(unsigned char* buffer); 
 }; 
