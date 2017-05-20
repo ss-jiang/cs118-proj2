@@ -19,8 +19,6 @@
 
 #include "TCPheader.h"
 
-#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
-
 // server is called with the following parameters
 // server <PORT> <FILE-DIR>
 
@@ -34,21 +32,15 @@ void signal_handler(int signum)
 }
 
 void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, int cwd, int ss_thresh, std::bitset<16> fl) {
-  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh << " ";
+  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh;
   if (fl[2]) {
-    std::cout << "ACK";
-    if(fl[1] || fl[0]) {
-      std::cout << " "; 
-    }
+    std::cout << " ACK";
   }
   if(fl[1]) {
-    std::cout << "SYN";
-    if(fl[0]) {
-      std::cout << " ";
-    } 
+    std::cout << " SYN";
   }
   if(fl[0]) {
-    std::cout << "FIN"; 
+    std::cout << " FIN"; 
   }
   std::cout << "\n"; 
 }
@@ -122,6 +114,7 @@ void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uin
 struct file_metadata {
 	std::string file_name;
 	// std::ofstream* file_d;
+	uint32_t last_sent_seq;
 	int file_size;
 };
 
@@ -272,6 +265,7 @@ int main(int argc, char* argv[])
 				file_metadata new_connection_data;
 				new_connection_data.file_size = 0;
 				new_connection_data.file_name = file_dir + "/" + std::to_string(cid) + ".file";
+				new_connection_data.last_sent_seq = server_seq;
 
 				file_des.push_back(new_connection_data);
 				cur_connIds.push_back(cid);
@@ -318,7 +312,7 @@ int main(int argc, char* argv[])
 	           	delete(fin_ack_buff);
 			}
 		    // client sends ACK to server's FIN-ACK
-			if (f[2] && in_fin_vector(fin_connIds, conn_id))
+			if (f[2] && in_fin_vector(fin_connIds, conn_id) && conn_id > 0)
 			{
 				//std::cout << "closing connection: " << conn_id << std::endl;
 				for (unsigned int i = 0; i < cur_connIds.size(); i++)
@@ -332,7 +326,7 @@ int main(int argc, char* argv[])
 			}
 		    // receiving 3rd part of the handshake, the data begins to be received here
 		    // ACK flag and no SYN flag
-		    if (((f[2] && !f[1]) || in_conn_id(cur_connIds, conn_id)) && !in_fin_vector(fin_connIds, conn_id))
+		    if (((f[2] && !f[1]) || in_conn_id(cur_connIds, conn_id)) && !in_fin_vector(fin_connIds, conn_id) && conn_id > 0)
 		    {
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
@@ -344,7 +338,7 @@ int main(int argc, char* argv[])
 
 			    char data_buffer[512]; 
 		    	int j = 0; 
-			    for(int i = 12; i < 524; i++) {
+			    for(unsigned int i = 12; i < sizeof(buf); i++) {
 			    	data_buffer[j] = buf[i];
 			    	j++;
 			    }
@@ -355,11 +349,18 @@ int main(int argc, char* argv[])
 			    new_file.write(data_buffer, rc - 12);
 			    file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
-			    //std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
-			    server_seq = (hs3_header.getAckNum()) % 102401;
+			    if (hs3_header.getAckNum() == 0)
+			    {
+			    	server_seq = file_des[conn_id-1].last_sent_seq;
+			    }
+			    else
+			    {
+			    	server_seq = (hs3_header.getAckNum()) % 102401;
+			    	file_des[conn_id-1].last_sent_seq = server_seq;
+			    }
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
