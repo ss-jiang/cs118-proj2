@@ -22,7 +22,6 @@
 #include "TCPheader.h"
 
 #define MAX_PATH_LENGTH        4096
-#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
 {
@@ -353,7 +352,7 @@ int main(int argc, char* argv[])
           //   sent_packet += 512;                        
           // }
         }
-        // received FIN-ACK from server
+        // received FIN-ACK or FIN from server
         if ((f[2] && f[0]) || f[0])
         {
           // std::cout << "here" << std::endl;
