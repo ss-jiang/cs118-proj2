@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
 			    	std::cerr << "ERROR: Could not send response header\n";
 			        exit(1); 
 			    }
-
+			    sleep(5);
 		    }
 		    // FIN flag received
 			if (f[0])
