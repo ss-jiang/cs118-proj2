@@ -212,8 +212,8 @@ int main(int argc, char* argv[])
 
 	std::vector<file_metadata> file_des;
 	std::vector<uint16_t> fin_connIds;
-	int cwd = 1; 
-	int ss_thresh = 512;
+	int cwd = 512; 
+	int ss_thresh = 10000;
 	// accept a new connection
 	struct sockaddr_storage clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
@@ -314,8 +314,8 @@ int main(int argc, char* argv[])
 			    //std::cout << "File size: " << file_des[conn_id-1].file_size << std::endl;
 			    new_file.close();
 
-			    server_ack = hs3_header.getSeqNum() + (rc - 12);
-			    server_seq = hs3_header.getAckNum();
+			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
+			    server_seq = (hs3_header.getAckNum()) % 102401;
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
@@ -338,7 +338,7 @@ int main(int argc, char* argv[])
 			{
 				unsigned char* fin_ack_buff = new unsigned char[12]; 
 	            server_seq = 4322; // 0, no ACK flag set
-	            server_ack = header.getSeqNum() + 1;
+	            server_ack = (header.getSeqNum() + 1) % 102401;
 	            cid = header.getConnectionId();
 
 	            fin_connIds.push_back(cid);
