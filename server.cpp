@@ -326,7 +326,7 @@ int main(int argc, char* argv[])
 					if (cur_connIds[i] == conn_id)
 					{
 						cur_connIds.erase(cur_connIds.begin()+i);
-						std::cout << "deleted connection id: " << conn_id << std::endl;
+						// std::cout << "deleted connection id: " << conn_id << std::endl;
 					}
 				}
 			}

@@ -6,3 +6,4 @@ client
 *.txt
 *.dat
 *.htm
+/cs118_proj2_sample_client_server
