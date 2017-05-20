@@ -103,6 +103,14 @@ struct file_metadata {
 	int file_size;
 };
 
+void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
+{
+  for (int i = 0; i < bytes; i++)
+  {
+    dest_buf[i] = buf[i];
+  } 
+}
+
 bool in_fin_vector(std::vector<uint16_t>& in_vector, uint16_t& id)
 {
 	for (unsigned int i = 0; i < in_vector.size(); i++)
@@ -226,21 +234,17 @@ int main(int argc, char* argv[])
 		    	std::cout << ">>>>>>>>>> 1st part of handshake received" << std::endl;
 
 			    server_ack = header.getSeqNum() + 1; // ack starts on the next byte of received seq num
+			    // increment connection count
+				cid++;
 
 		    	// create new file descriptor for each connection
-	    		std::string save_name = file_dir + "/" + std::to_string(cid) + ".file";
 				std::ofstream new_file;
 
 				file_metadata new_connection_data;
 				new_connection_data.file_size = 0;
 				new_connection_data.file_name = file_dir + "/" + std::to_string(cid) + ".file";
-				// new_file.open(save_name, std::ios::out | std::ios::binary);
-				// new_connection_data.file_d = &new_file;
 
 				file_des.push_back(new_connection_data);
-
-				// increment connection count
-				cid++;
 
 			    // send SYN-ACK to client, responds to receiving a packet from the client
 			    // response headers needs to be set up with the receiver header's ack number
@@ -250,10 +254,8 @@ int main(int argc, char* argv[])
 
 			    // sending 2nd part of the handshake buffer
 			    unsigned char* resp_buf = resp_header.toCharBuffer(); 
-			    unsigned char hs2_buf[12]; 
-			    for(int i = 0; i < 12; i++) {
-			      	hs2_buf[i] = resp_buf[i];
-			    }
+			    unsigned char hs2_buf[12];
+			    pointerToBuffer(resp_buf, hs2_buf, 12);
 
 			    if (sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
@@ -267,12 +269,10 @@ int main(int argc, char* argv[])
 			{
 				std::cout << "closing connection: " << conn_id << std::endl;
 			}
-
 		    // receiving 3rd part of the handshake, the data begins to be received here
 		    // ACK flag and no SYN flag
 		    if (f[2] && !f[1] && conn_id > 0 && !in_fin_vector(fin_connIds, conn_id))
 		    {
-		    	//std::cout << ">>>>>>>>>> 3rd part of handshake received" << std::endl; 
 		    	std::cout << ">>>>>>>>>> received ack\n";
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
@@ -305,10 +305,9 @@ int main(int argc, char* argv[])
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    resp_header.printInfo();
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
+
 	            unsigned char ack_buffer[12]; 
-	            for(int i = 0; i < 12; i++) {
-	            	ack_buffer[i] = ack_buf[i];
-	            }
+	            pointerToBuffer(ack_buf, ack_buffer, 12);
 
 			    // send ACK back to client
 			    if (sendto(sockfd, ack_buffer, sizeof(ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
@@ -332,10 +331,8 @@ int main(int argc, char* argv[])
 	            TCPheader fin_ack_header(server_seq, server_ack, cid, 1, 0, 1);
 	            fin_ack_buff = fin_ack_header.toCharBuffer();
 
-	            unsigned char fin_buf[12]; 
-	            for(int i = 0; i < 12; i++) {
-	            	fin_buf[i] = fin_ack_buff[i];
-	            }
+	            unsigned char fin_buf[12];
+	            pointerToBuffer(fin_ack_buff, fin_buf, 12);
 	            fin_ack_header.printInfo();
 
 	            std::cout << "<<<<<<<<<<< sending fin-ack\n";

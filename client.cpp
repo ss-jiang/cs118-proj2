@@ -23,6 +23,15 @@
 
 #define MAX_PATH_LENGTH        4096
 
+
+void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
+{
+  for (int i = 0; i < bytes; i++)
+  {
+    dest_buf[i] = buf[i];
+  } 
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 4) {
@@ -123,11 +132,9 @@ int main(int argc, char* argv[])
 
         TCPheader recv_header;
         recv_header.parseBuffer(headers_buf);
-        // recv_header.printInfo();
 
         // check flags, we need the SYN/ACK/FIN flags and the connection id
         std::bitset<16> f = recv_header.getFlags();
-        // std::cout << f << std::endl;
 
         // received SYN-ACK from server
         if (f[2] && f[1] && !syn_ack_established)
@@ -152,20 +159,18 @@ int main(int argc, char* argv[])
           // change fin_sent flag
           fin_sent = true;
           unsigned char fin_buffer[12]; 
-          for(int i = 0; i < 12; i++) {
-              fin_buffer[i] = fin_buff[i];
-          }
+          pointerToBuffer(fin_buff, fin_buffer, 12);
 
           if (sendto(sockfd, fin_buffer, sizeof(fin_buffer), 0, res->ai_addr, res->ai_addrlen) < 0)
           {
             std::cerr << "ERROR: Could not send file\n";
             exit(1); 
           }
+          delete(fin_buff);
         }
         // while we get an ack from the server and we havent finished sending the file
         if (f[2] && syn_ack_established && !open_file.eof())
         {
-          // std::cout << ">>>>>>>>>>>>> 3rd part of handshake sent" << std::endl;
           std::cout << ">>>>>>>>>>>>> received ack\n";
           unsigned char* hs3_buff = new unsigned char[12]; 
           seq_num = recv_header.getAckNum();
@@ -177,10 +182,7 @@ int main(int argc, char* argv[])
 
           char read_buffer[512];
           unsigned char hs3_buffer[524]; 
-          for(int i = 0; i < 12; i++) {
-             hs3_buffer[i] = hs3_buff[i];
-          }
-          delete(hs3_buff);  
+          pointerToBuffer(hs3_buff, hs3_buffer, 12);
 
           // reading the file with offset
           open_file.seekg(read_offset);
@@ -202,6 +204,7 @@ int main(int argc, char* argv[])
             std::cerr << "ERROR: Could not send file\n";
             exit(1); 
           }
+          delete(hs3_buff);  
         }
         // received FIN-ACK from server
         if (f[2] && f[0])
@@ -215,9 +218,7 @@ int main(int argc, char* argv[])
           close_conn_buff = fin_header.toCharBuffer();
 
           unsigned char close_buf[12]; 
-          for(int i = 0; i < 12; i++) {
-            close_buf[i] = close_conn_buff[i];
-          }
+          pointerToBuffer(close_conn_buff, close_buf, 12);
           fin_header.printInfo();
 
           if (sendto(sockfd, close_buf, sizeof(close_buf), 0, res->ai_addr, res->ai_addrlen) < 0)
