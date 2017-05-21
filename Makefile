@@ -17,5 +17,5 @@ clean:
 
 dist: tarball
 tarball: clean
-	tar -cvzf /tmp/$(USERID).tar.gz --exclude=./.vagrant . --exclude=./*.txt --exclude=./cs118_proj2_sample_client_server --exclude=./upload_test --exclude=./*.tar.gz && mv /tmp/$(USERID).tar.gz .
+	tar -cvzf /tmp/$(USERID).tar.gz --exclude=./.vagrant . --exclude=./*.txt --exclude=./cs118_proj2_sample_client_server --exclude=./upload_test --exclude=./*.tar.gz --exclude= ./*.html && mv /tmp/$(USERID).tar.gz .
 

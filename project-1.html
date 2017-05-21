@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <title>Project 1: "Accio" File using TCP - CS118: Computer Network Fundamentals - Spring 2017 (UCLA)</title>
+  <meta name="description" content="">
+  <meta name="author" content="Alexander Afanasyev">
+  <link rel="canonical" href="http://web.cs.ucla.edu/project-1">
+  <!-- Le styles -->
+
+  <link rel="stylesheet" href="/classes/spring17/cs118/css/style.css">
+</head>
+<body>
+  <header id="header">
+    <hgroup>
+      <h1 id="site-title">
+        <a class="full" href="http://web.cs.ucla.edu/classes/spring17/cs118/">CS118: Computer Network Fundamentals - Spring 2017 (UCLA)</a>
+        <a class="hidden-print short" href="/classes/spring17/cs118/"></a>
+      </h1>
+      
+    </hgroup>
+  </header>
+
+  <nav id="navbar">
+    <nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse-1">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+
+    <div class="collapse navbar-collapse" id="bs-navbar-collapse-1">
+      <ul class="nav navbar-nav">
+
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/">Home</a>
+          </li>
+  
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/syllabus.html">Syllabus</a>
+          </li>
+  
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/homeworks.html">Homeworks</a>
+          </li>
+  
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/project-1.html">Project 1 (Acio)</a>
+          </li>
+  
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/project-2.html">Project 2 (Confundo)</a>
+          </li>
+  
+
+  
+  
+          <li class="">
+            <a href="/classes/spring17/cs118/project-3.html">Project 3 (Riddikulus)</a>
+          </li>
+  
+
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  </nav>
+
+  <div class="container-fluid">
+    <div class="row-fluid">
+
+      <div id="main" class="col-xs-12 col-sm-12">
+        <article>
+  
+  <section>
+    <h1>Project 1: "Accio" File using TCP</h1>
+    <ul id="markdown-toc">
+  <li><a href="#overview" id="markdown-toc-overview">Overview</a></li>
+  <li><a href="#task-description" id="markdown-toc-task-description">Task Description</a>    <ul>
+      <li><a href="#server-application-specification" id="markdown-toc-server-application-specification">Server Application Specification</a></li>
+      <li><a href="#client-application-specification" id="markdown-toc-client-application-specification">Client Application Specification</a></li>
+    </ul>
+  </li>
+  <li><a href="#a-few-hints" id="markdown-toc-a-few-hints">A Few Hints</a></li>
+  <li><a href="#environment-setup" id="markdown-toc-environment-setup">Environment Setup</a>    <ul>
+      <li><a href="#set-up-vagrant-and-create-vm-instance" id="markdown-toc-set-up-vagrant-and-create-vm-instance">Set Up Vagrant and Create VM Instance</a></li>
+      <li><a href="#notes" id="markdown-toc-notes">Notes</a></li>
+    </ul>
+  </li>
+  <li><a href="#submission-requirements" id="markdown-toc-submission-requirements">Submission Requirements</a></li>
+  <li><a href="#grading" id="markdown-toc-grading">Grading</a>    <ul>
+      <li><a href="#grading-criteria" id="markdown-toc-grading-criteria">Grading Criteria</a></li>
+      <li><a href="#deductions" id="markdown-toc-deductions">Deductions</a></li>
+      <li><a href="#extra-credit" id="markdown-toc-extra-credit">Extra Credit</a></li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="overview">Overview</h2>
+
+<p>In this project, you will need to implement a simple client-server application that transfers a file over a TCP connection.</p>
+
+<p>All implementations should be written in C++ using <a href="http://en.wikipedia.org/wiki/Berkeley_sockets">BSD sockets</a>.
+<strong>No high-level network-layer abstractions (like Boost.Asio or similar) are allowed in this project.</strong>
+You are allowed to use some high-level abstractions, including C++11 extensions, for parts that are not directly related to networking, such as string parsing, multi-threading.
+We will also accept implementations written in C, however use of C++ is preferred.</p>
+
+<p>The objective of this project is to learn basic operations of BSD sockets, understand implications of using the API, as well as to discover common pitfalls when working with network operations.</p>
+
+<p>You are required to use <code class="highlighter-rouge">git</code> to track the progress of your work. <strong>The project can receive a full grade only if the submission includes git history no shorter than 3 commits.</strong></p>
+
+<p class="alert alert-danger">You are encouraged to host your code in private repositories on <a href="https://github.com/">GitHub</a>, <a href="https://gitlab.com">GitLab</a>, or other places.  At the same time, you are PROHIBITED to make your code for the class project public during the class or any time after the class.  If you do so, you will be violating academic honestly policy that you have signed, as well as the student code of conduct and be subject to serious sanctions.</p>
+
+<h2 id="task-description">Task Description</h2>
+
+<p>The project contains two parts: a server and a client.</p>
+
+<ul>
+  <li>The server listens for TCP connections and saves all the received data from the client in a file.</li>
+  <li>The client connects to the server and as soon as connection established, sends the content of a file to the server.</li>
+</ul>
+
+<h3 id="server-application-specification">Server Application Specification</h3>
+
+<p>The server application MUST be compiled into <code class="highlighter-rouge">server</code> binary, accepting two command-line arguments:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ server &lt;PORT&gt; &lt;FILE-DIR&gt;
+</code></pre>
+</div>
+
+<ul>
+  <li><code class="highlighter-rouge">&lt;PORT&gt;</code>: port number on which server will listen on connections.  The server must accept connections coming from any interface.</li>
+  <li><code class="highlighter-rouge">&lt;FILE-DIR&gt;</code>: directory name where to save the received files.</li>
+</ul>
+
+<p>For example, the command below should start the server listening on port <code class="highlighter-rouge">5000</code> and saving received files in the directory <code class="highlighter-rouge">/save</code>.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ./server 5000 /save
+</code></pre>
+</div>
+
+<p><strong>Requirements</strong>:</p>
+
+<ul>
+  <li>
+    <p>The server must open a listening socket on the specified port number</p>
+  </li>
+  <li>
+    <p>The server should gracefully process incorrect port number and exit with a non-zero error code (you can assume that the folder is always correct).  In addition to exit, the server must print out on standard error (<code class="highlighter-rouge">std::cerr</code>) an error message that starts with <code class="highlighter-rouge">ERROR:</code> string.</p>
+  </li>
+  <li>
+    <p>The server should exit with code zero when receiving <code class="highlighter-rouge">SIGQUIT</code>/<code class="highlighter-rouge">SIGTERM</code> signal</p>
+  </li>
+  <li>
+    <p>The server should be able to accept and process multiple connection from clients at the same time</p>
+  </li>
+  <li>
+    <p>The server must count all established connections (1 for the first connect, 2 for the second, etc.).  The received file over the connection must be saved to <code class="highlighter-rouge">&lt;FILE-DIR&gt;/&lt;CONNECTION-ID&gt;.file</code> file  (e.g., <code class="highlighter-rouge">/save/1.file</code>, <code class="highlighter-rouge">/save/2.file</code>, etc.).  If the client doesn’t send any data during gracefully terminated TCP connection, the server should create an empty file with the name that corresponds to the connection number.</p>
+  </li>
+  <li>
+    <p>The server must assume error if no data received from the client for over <code class="highlighter-rouge">10 seconds</code>.  It should abort the connection and write a single <code class="highlighter-rouge">ERROR</code> string (without end-of-line/carret-return symbol) into the corresponding file.  Note that any partial input must be discarded.</p>
+  </li>
+  <li>
+    <p>The server should be able to accept and save files up to <code class="highlighter-rouge">100 MiB</code></p>
+  </li>
+</ul>
+
+<h3 id="client-application-specification">Client Application Specification</h3>
+
+<p>The client application MUST be compiled into <code class="highlighter-rouge">client</code> binary, accepting three command-line arguments:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ./client &lt;HOSTNAME-OR-IP&gt; &lt;PORT&gt; &lt;FILENAME&gt;
+</code></pre>
+</div>
+
+<ul>
+  <li><code class="highlighter-rouge">&lt;HOSTNAME-OR-IP&gt;</code>: hostname or IP address of the server to connect</li>
+  <li><code class="highlighter-rouge">&lt;PORT&gt;</code>: port number of the server to connect</li>
+  <li><code class="highlighter-rouge">&lt;FILENAME&gt;</code>: name of the file to transfer to the server after the connection is established.</li>
+</ul>
+
+<p>For example, the command below should result in connection to a server on the same machine listening on port 5000 and transfer content of <code class="highlighter-rouge">file.txt</code>:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ./client localhost 5000 file.txt
+</code></pre>
+</div>
+
+<p><strong>Requirements</strong>:</p>
+
+<ul>
+  <li>
+    <p>The client must be able to connect to the specified server and port, transfer the specified file, and gracefully terminate the connection.</p>
+  </li>
+  <li>
+    <p>The client should gracefully process incorrect hostname and port number and exist with a non-zero exit code (you can assume that the specified file is always correct).  In addition to exit, the server must print out on standard error (<code class="highlighter-rouge">std::cerr</code>) an error message that starts with <code class="highlighter-rouge">ERROR:</code> string.</p>
+  </li>
+  <li>
+    <p>Client application should exit with code zero after successful transfer of the file to server.  It should support transfer of files that are up to 100 MiB file.</p>
+  </li>
+  <li>
+    <p>Client should handle connection and transmission errors.  The reaction to network or server errors should be <strong>no longer that 10 seconds</strong>:</p>
+
+    <ul>
+      <li>Timeout to connect to server should be no longer than <code class="highlighter-rouge">10 seconds</code></li>
+      <li>Timeout for not being able to send more data to server (not being able to write to send buffer) should be no longer than <code class="highlighter-rouge">10 seconds</code>.</li>
+    </ul>
+
+    <p>Whenever timeout occurs, the client should abort the connection, print an error string starting with <code class="highlighter-rouge">ERROR:</code> to standard error (<code class="highlighter-rouge">std::cerr</code>), and exit with non-zero code.</p>
+  </li>
+</ul>
+
+<h2 id="a-few-hints">A Few Hints</h2>
+
+<p>General hints:</p>
+
+<ul>
+  <li>
+    <p>If you are running the client and the server on the same machine, you can use “localhost” (without quotes) or “127.0.0.1” (without quotes) as the name of the server.</p>
+  </li>
+  <li>
+    <p>You should NOT use port numbers in the range of 0-1023 (these are reserved ports).  Test your client/server code by running as non-privileged user.  This will allow you to capture reserved port restrictions from the kernel.</p>
+  </li>
+</ul>
+
+<p>Here are some hints of using multi-thread techniques to implement the server.</p>
+
+<ul>
+  <li>For the server, you may have the main thread listening (and accepting) incoming <strong>connection requests</strong>.
+    <ul>
+      <li>Any special socket API you need here?</li>
+      <li>How to keep the listening socket receiving new requests?</li>
+    </ul>
+  </li>
+  <li>Once you accept a new connection, create a child thread for the new connection.
+    <ul>
+      <li>Is the new connection using the same socket as the one used by the main thread?</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Here are some sample codes:</p>
+
+<ul>
+  <li>
+    <p>A simple server that echoes back anything sent by the client: <a href="/classes/spring17/cs118/hints/server.cpp">server.cpp</a>, <a href="/classes/spring17/cs118/hints/client.cpp">client.cpp</a></p>
+  </li>
+  <li>
+    <p>A simple multi-thread countdown: <a href="/classes/spring17/cs118/hints/multi-thread.cpp">multi-thread.cpp</a></p>
+  </li>
+</ul>
+
+<p>Other resources</p>
+
+<ul>
+  <li><a href="http://beej.us/guide/bgnet/">Guide to Network Programming Using Sockets</a></li>
+</ul>
+
+<h2 id="environment-setup">Environment Setup</h2>
+
+<p>The best way to guarantee full credit for the project is to do project development using a Ubuntu 16.04-based virtual machine.</p>
+
+<p>You can easily create an image in your favourite virtualization engine (VirtualBox, VMware) using the Vagrant platform and steps outlined below.</p>
+
+<h3 id="set-up-vagrant-and-create-vm-instance">Set Up Vagrant and Create VM Instance</h3>
+
+<p><strong>Note that all example commands are executed on the host machine (your laptop), e.g., in <code class="highlighter-rouge">Terminal.app</code> (or <code class="highlighter-rouge">iTerm2.app</code>) on macOS, <code class="highlighter-rouge">cmd</code> in Windows, and <code class="highlighter-rouge">console</code> or <code class="highlighter-rouge">xterm</code> on Linux.  After the last step (<code class="highlighter-rouge">vagrant ssh</code>) you will get inside the virtual machine and can compile your code there.</strong></p>
+
+<ul>
+  <li>
+    <p>Download and install your favourite virtualization engine, e.g., <a href="https://www.virtualbox.org/wiki/Downloads">VirtualBox</a></p>
+  </li>
+  <li>
+    <p>Download and install <a href="https://www.vagrantup.com/downloads.html">Vagrant tools</a> for your platform</p>
+  </li>
+  <li>
+    <p>Set up project and VM instance</p>
+
+    <ul>
+      <li>
+        <p>Clone project template</p>
+
+        <div class="highlighter-rouge"><pre class="highlight"><code>git clone https://github.com/cs118/spring17-project1 ~/cs118-proj1
+cd ~/cs118-proj1
+</code></pre>
+        </div>
+      </li>
+      <li>
+        <p>Initialize VM</p>
+
+        <div class="highlighter-rouge"><pre class="highlight"><code>vagrant up
+</code></pre>
+        </div>
+
+        <p class="alert alert-warning">Do not start VM instance manually from VirtualBox GUI, otherwise you may have various problems (connection error, connection timeout, missing packages, etc.)</p>
+      </li>
+      <li>
+        <p>To establish an SSH session to the created VM, run</p>
+
+        <div class="highlighter-rouge"><pre class="highlight"><code>vagrant ssh
+</code></pre>
+        </div>
+      </li>
+    </ul>
+
+    <p>If you are using Putty on Windows platform, <code class="highlighter-rouge">vagrant ssh</code> will return information regarding the IP address and the port to connect to your virtual machine.</p>
+  </li>
+  <li>
+    <p>Work on your project</p>
+
+    <p>All files in <code class="highlighter-rouge">~/cs118-proj1</code> folder on the host machine will be automatically synchronized with <code class="highlighter-rouge">/vagrant</code> folder on the virtual machine.  For example, to compile your code, you can run the following commands:</p>
+
+    <div class="highlighter-rouge"><pre class="highlight"><code>  vagrant ssh
+  cd /vagrant
+  make
+</code></pre>
+    </div>
+  </li>
+</ul>
+
+<h3 id="notes">Notes</h3>
+
+<ul>
+  <li>
+    <p>If you want to open another SSH session, just open another terminal and run <code class="highlighter-rouge">vagrant ssh</code> (or create a new Putty session).</p>
+  </li>
+  <li>
+    <p>If you are using Windows, read <a href="http://www.sitepoint.com/getting-started-vagrant-windows/">this article</a> to help yourself set up the environment.</p>
+  </li>
+  <li>
+    <p>The code base contains the basic <code class="highlighter-rouge">Makefile</code> and two empty files <code class="highlighter-rouge">server.cpp</code> and <code class="highlighter-rouge">client.cpp</code>.</p>
+
+    <div class="highlighter-rouge"><pre class="highlight"><code>  $ vagrant ssh
+  vagrant@vagrant:~$ cd /vagrant
+  vagrant@vagrant:/vagrant$ ls -a
+  .  ..  client  client.cpp  .git  .gitignore  Makefile  README.md  server  server.cpp  .vagrant  Vagrantfile
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>You are now free to add more files and modify the Makefile to make the <code class="highlighter-rouge">server</code> and <code class="highlighter-rouge">client</code> full-fledged implementation.</p>
+  </li>
+</ul>
+
+<h2 id="submission-requirements">Submission Requirements</h2>
+
+<p>To submit your project, you need to prepare:</p>
+
+<ol>
+  <li>
+    <p>A <code class="highlighter-rouge">README.md</code> file placed in your code that includes:</p>
+
+    <ul>
+      <li>Your name, UCLA ID</li>
+      <li>The high level design of your server and client</li>
+      <li>The problems you ran into and how you solved the problems</li>
+      <li>List of any additional libraries used</li>
+      <li>Acknowledgement of any online tutorials or code example (except class website) you have been using.</li>
+    </ul>
+
+    <p><strong>If you need additional dependencies for your project, you must update Vagrant file.</strong></p>
+  </li>
+  <li>
+    <p>All your source code, <code class="highlighter-rouge">Makefile</code>, <code class="highlighter-rouge">README.md</code>, <code class="highlighter-rouge">Vagrantfile</code>, and <code class="highlighter-rouge">.git</code> folder with your git repository history as a <code class="highlighter-rouge">.tar.gz</code> archive (and any files from extra credit part).</p>
+
+    <p>To create the submission, <strong>use the provided Makefile</strong> in the skeleton project.  Just update <code class="highlighter-rouge">Makefile</code> to include your UCLA ID and then just type</p>
+
+    <div class="highlighter-rouge"><pre class="highlight"><code> make tarball
+</code></pre>
+    </div>
+
+    <p>Then submit the resulting archive to Gradescope.</p>
+  </li>
+</ol>
+
+<p>Before submission, please make sure:</p>
+
+<ol>
+  <li>Your code compiles</li>
+  <li>Client and server conforms to the specification</li>
+  <li><code class="highlighter-rouge">.tar.gz</code> archive does not contain temporary or other unnecessary files.  We will automatically deduct points otherwise.</li>
+</ol>
+
+<p class="bs-callout bs-callout-danger">Submissions that do not follow these requirements will not get any credit.</p>
+
+<h2 id="grading">Grading</h2>
+
+<p>Your code will be first checked by a software plagiarism detecting tool. If we find any plagiarism, you will not get any credit.</p>
+
+<p>Your code will then be automatically tested in some testing scenarios.</p>
+
+<p>We will test your server against a “standard” implementation of the client, your client against a “standard” server, as well as your client against your server.  Projects receive full credit only all these checks are passed.</p>
+
+<h3 id="grading-criteria">Grading Criteria</h3>
+
+<ol>
+  <li>(2.5 pts) At least 3 git commits</li>
+  <li>(2.5 pts, public test) Client handles incorrect hostname/port</li>
+  <li>(2.5 pts, public test) Server handles incorrect port</li>
+  <li>(2.5 pts, public test) Server handles <code class="highlighter-rouge">SIGTERM</code> / <code class="highlighter-rouge">SIGQUIT</code> signals</li>
+  <li>(5 pts, public test) Client connects and starts transmitting a file</li>
+  <li>(5 pts, public test) Server accepts a connection and start saving a file</li>
+  <li>(5 pts, public test) Client able to successfully transmit a small file (500 bytes)</li>
+  <li>(10 pts, 2 private tests) Client able to successfully transmit a medium size file (1 MiB)
+    <ul>
+      <li>sending in large chunks without delays</li>
+      <li>sending in small chunks, delaying each chunk a bit</li>
+    </ul>
+  </li>
+  <li>(10 pts, 2 private tests) Client able to successfully transmit a large size file (100 MiB)
+    <ul>
+      <li>sending in large chunks without delays</li>
+      <li>sending in small chunks, delaying each chunk a bit</li>
+    </ul>
+  </li>
+  <li>(5 pts, public test) Server able to receive a small file (500 bytes) and save it in <code class="highlighter-rouge">1.file</code></li>
+  <li>(10 pts, 2 private tests) Server able to receive a medium file (1 MiB bytes) and save it in <code class="highlighter-rouge">1.file</code>
+    <ul>
+      <li>receiving file sent in large chunks without delays</li>
+      <li>receiving file sent in small chunks with delays</li>
+    </ul>
+  </li>
+  <li>(10 pts, 2 private tests) Server able to receive a large file (100 MiB bytes) and save it in <code class="highlighter-rouge">1.file</code>
+    <ul>
+      <li>receiving file sent in large chunks without delays</li>
+      <li>receiving file sent in small chunks with delays</li>
+    </ul>
+  </li>
+  <li>(10 pts, 1 public and 1 private test) Server can properly receive 10 small files (sent without delays) in <code class="highlighter-rouge">1.file</code>, <code class="highlighter-rouge">2.file</code>, … <code class="highlighter-rouge">3.file</code>
+    <ul>
+      <li>a single client connects sequentially</li>
+      <li>10 clients connect simultaneously (our test will ensure proper ordering of connections)</li>
+    </ul>
+  </li>
+  <li>(5 pts, public test) Client handles abort connection attempt after 10 seconds.</li>
+  <li>(5 pts, private test) Client aborts connection when server gets disconnected (server app or network connection is down)</li>
+  <li>(5 pts, private test) Server aborts connection (a file should be created, containing only <code class="highlighter-rouge">ERROR</code> string) when doesn’t receive data from client for more than 10 seconds</li>
+  <li>(5 pts, private test) Client able to successfully send and server properly receive and save large file over lossy and large delay network (we will use <code class="highlighter-rouge">tc</code> based emulation.</li>
+</ol>
+
+<h3 id="deductions">Deductions</h3>
+
+<ol>
+  <li>(-5 pts) The submission archive contains temporary or other non-source code file, except <code class="highlighter-rouge">README.md</code>, <code class="highlighter-rouge">Vagrantfile</code>, files under <code class="highlighter-rouge">.git</code> subfolder (and any files from extra credit part).</li>
+</ol>
+
+<h3 id="extra-credit">Extra Credit</h3>
+
+<ol>
+  <li>(2.5 pts) <code class="highlighter-rouge">Dockerfile</code> and relevant description in <code class="highlighter-rouge">README.md</code> for deployment of server as a Docker container.</li>
+</ol>
+
+  </section>
+
+  <footer>
+  </footer>
+</article>
+
+      </div>
+
+    </div><!--/row-->
+  </div> <!-- /container -->
+
+  <hr>
+
+  <footer id="footer">
+    <p>Copyright &copy; 2017, Alexander Afanasyev</p>
+  </footer>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="/classes/spring17/cs118/js/bootstrap.min.js"></script>
+  <script src="/classes/spring17/cs118/js/site.js"></script>
+  <script>
+   (function(win, doc, script) {
+       
+   }(window, document, 'script'));
+  </script>
+</body>
+</html>
