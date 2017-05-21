@@ -139,9 +139,9 @@ int main(int argc, char* argv[])
 	}
 
 	// set non-blocking
-	long arg = fcntl(sockfd, F_GETFL, NULL); 
-	arg |= O_NONBLOCK; 
-	fcntl(sockfd, F_SETFL, arg); 
+	// long arg = fcntl(sockfd, F_GETFL, NULL); 
+	// arg |= O_NONBLOCK; 
+	// fcntl(sockfd, F_SETFL, arg); 
 
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
@@ -165,13 +165,15 @@ int main(int argc, char* argv[])
 	uint32_t server_seq = 4321;
     uint32_t server_ack;
     uint16_t cid = 0; 
+    // uint32_t asdf = 0;
+    // uint32_t asdf2 = 0;
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
 	while(1)
 	{
 		// receive first part of handshake 
 		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-
+		// asdf2 += (rc - 12);
 	    if (rc > 0)
 	    {
 	    	// isolate the header bytes from the packet
@@ -208,7 +210,7 @@ int main(int argc, char* argv[])
 
 			    // send SYN-ACK to client, responds to receiving a packet from the client
 			    // response headers needs to be set up with the receiver header's ack number
-			    TCPheader resp_header(server_seq, server_ack, cid, 1, 1, 0);
+			    TCPheader resp_header(4321, server_ack, cid, 1, 1, 0);
 
 			    // sending 2nd part of the handshake buffer
 			    unsigned char* resp_buf = resp_header.toCharBuffer(); 
@@ -255,6 +257,8 @@ int main(int argc, char* argv[])
 				{
 					if (cur_connIds[i] == conn_id)
 					{
+						// std::cout << "TOTAL RECEIVED: " << asdf2 << std::endl;
+						// std::cout << "TOTAL WRITTEN: " << asdf << std::endl;
 						cur_connIds.erase(cur_connIds.begin()+i);
 						// std::cout << "deleted connection id: " << conn_id << std::endl;
 					}
@@ -286,8 +290,13 @@ int main(int argc, char* argv[])
 			    file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
 			    new_file.close();
+			    // asdf += (rc - 12);
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
+			    // THIS MAY BE WRONG 
+			    server_seq = hs3_header.getAckNum();
+			    // THIS MAY BE WRONG 
+			    
 			    // if (hs3_header.getAckNum() == 0)
 			    // {
 			    // 	server_seq = file_des[conn_id-1].last_sent_seq;

@@ -77,10 +77,6 @@ struct lastSentPacket {
   unsigned char lastSentData[524];
 };
 
-struct lastSentHeader {
-  unsigned char lastSentHead[12];
-};
-
 int main(int argc, char* argv[])
 {
   if (argc != 4) {
@@ -94,6 +90,10 @@ int main(int argc, char* argv[])
   bool syn_ack_established = false;
   int read_offset = 0;
   bool fin_sent = false;
+
+  uint32_t lastSequenceSent = 12346;
+  uint32_t totalSeqenceSent = 12346;
+  uint32_t lastRecvAckNum = 0; 
 
   // Check that the port number is in range
   if (port_num < 1024 || port_num > 65535) {
@@ -148,11 +148,10 @@ int main(int argc, char* argv[])
   int ss_thresh = 10000; 
   // buffer to receive from server
   unsigned char recv_buffer[12];
-  uint32_t lastSequenceSent = 0;
   //uint32_t prevSeqNum = 0;
   lastSentPacket lastSent;
-  lastSentHeader lastHead; 
   int lastSentMode = 0; //0 is none, 1 is lasthead, 2 is lastSent 
+  uint32_t lastSequenceNum = 12346;
   TCPheader header(seq_num, ack_num, cid, ack, syn, fin); 
   unsigned char* buf = header.toCharBuffer(); 
   unsigned char hs1_buf[12]; 
@@ -182,12 +181,12 @@ int main(int argc, char* argv[])
       timeval recvTimeval;
       recvTimeval.tv_sec = 0;
       recvTimeval.tv_usec = 500000;
-      int r = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (void*)&recvTimeval, sizeof(recvTimeval));
-      if (r == -1) {
-        perror("setsockopt");
-        exit(1);
-      }
+      fd_set fdsets; 
+      FD_ZERO(&fdsets);
+      FD_SET(sockfd, &fdsets);
+      int rc;
 
+      rc = select(sockfd + 1, &fdset, NULL, NULL, &recvTimeval);
       rv = select(sockfd + 1, &fdset, NULL, NULL, &clientTimeval);
       int recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
       if (rv == 0)
@@ -201,36 +200,44 @@ int main(int argc, char* argv[])
       {
         break;
       }
-      if (recv == -1) { // retransmission timeout
-        if (errno == EWOULDBLOCK) {
-          ss_thresh = cwd / 2; 
-          cwd = 512;
-          unsigned char* retransmit_header = new unsigned char[12];
-          for(int i = 0; i < 12; i++) {
-            retransmit_header[i] = lastSent.lastSentData[i];
-          }
-          TCPheader re_header;
-          re_header.parseBuffer(retransmit_header); 
-
-          unsigned char retransmit_data[512]; 
-          if(lastSentMode == 1) {
-            //
-          } else {
-            int p = 0;
-            for (int i = 12; i < 524; i++) {
-              retransmit_data[p] = lastSent.lastSentData[i];
-              p++;
-            }
-          }
-
-          printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
-        } else {
-          perror("recvfrom"); 
-          exit(1); 
+      if (rc == 0) { // retransmission timeout
+        // congestion avoidance protocol
+        ss_thresh = cwd / 2; 
+        cwd = 512;
+        unsigned char* retransmit_header = new unsigned char[12];
+        for(int i = 0; i < 12; i++) {
+          retransmit_header[i] = lastSent.lastSentData[i];
         }
+        TCPheader re_header;
+        re_header.parseBuffer(retransmit_header); 
+
+        unsigned char retransmit_data[512]; 
+        if(lastSentMode == 1) {
+          //only retransmitting headers
+          unsigned char rebuf[12]; 
+          pointerToBuffer(re_header.toCharBuffer(), rebuf, 12); 
+          if (sendto(sockfd, rebuf, sizeof(rebuf), 0, res->ai_addr, res->ai_addrlen) < 0)
+          {
+            std::cerr << "ERROR: Could not send file\n";
+            exit(1); 
+          }
+        } else {
+          // retransmitting the data of last sentPacket
+          if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
+          {
+            std::cerr << "ERROR: Could not send file\n";
+            exit(1); 
+          }
+        }
+
+        printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
+
         continue;
+      } else if (rc < 0) {
+        break;
       }
-      if (recv > 0)
+
+      if (rv > 0 && recv > 0 && rc > 0)
       {
        
         unsigned char* headers_buf = new unsigned char[12]; 
@@ -250,19 +257,23 @@ int main(int argc, char* argv[])
 
         //if ACK is received, then adjust cwd and ss-thresh accordingly 
         if(f[2]) {
+          // std::cout << lastSequenceNum << "--" << recv_header.getAckNum() << std::endl;
           if(cwd < ss_thresh) {
             cwd += 512;
           }
           if(cwd >= ss_thresh) {
             cwd += (512 * 512) / cwd; 
           }
+          if(lastSequenceNum != recv_header.getAckNum()){
+            continue;
+          }
         }
 
         if(f[2] && fin_sent && !f[0]) { // scenario, sent fin, received only ack, separate case than fin-ack
-          // // set non-blocking
-          long arg = fcntl(sockfd, F_GETFL, NULL); 
-          arg |= O_NONBLOCK; 
-          fcntl(sockfd, F_SETFL, arg);        
+          // // // set non-blocking
+          // long arg = fcntl(sockfd, F_GETFL, NULL); 
+          // arg |= O_NONBLOCK; 
+          // fcntl(sockfd, F_SETFL, arg);        
 
           //once recieved FIN-ACK, have 2 seconds before client terminates
           timeval finTimeval; 
@@ -345,6 +356,11 @@ int main(int argc, char* argv[])
           ack_num = 0; // 0, no ACK flag set
           cid = recv_header.getConnectionId();
 
+          // std::cout << read_offset << std::endl;
+          // std::cout << seq_num << "--" << lastSequenceSent << "--" << totalSeqenceSent << std::endl;
+          if (seq_num != lastSequenceSent)
+            continue;
+
           TCPheader fin_header(seq_num, ack_num, cid, 0, 0, 1);
           fin_buff = fin_header.toCharBuffer();
 
@@ -367,15 +383,26 @@ int main(int argc, char* argv[])
             exit(1); 
           }
           delete(fin_buff);
+          lastSequenceNum += 1;
+          lastSequenceNum %= 102401;
         }
         // while we get an ack from the server and we havent finished sending the file
         if (f[2] && syn_ack_established && !open_file.eof())
         {
+          lastRecvAckNum = (recv_header.getAckNum() % 102401);
           unsigned char* hs3_buff = new unsigned char[12]; 
-          seq_num = recv_header.getAckNum();
+          seq_num = (recv_header.getAckNum() % 102401);
           ack_num = recv_header.getSeqNum() + 1; // 1 for now, it needs to be 1 + however much payload we have
           cid = recv_header.getConnectionId();
-          TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0); 
+
+          TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0);
+          if (seq_num < totalSeqenceSent)
+          {
+            seq_num = lastSequenceSent;
+            hs3_header.setSeqNum(lastSequenceSent);
+            hs3_header.setAckNum(0);
+            hs3_header.setFlags(0, 0, 0);
+          }
           hs3_buff = hs3_header.toCharBuffer();
 
           char read_buffer[512];
@@ -394,77 +421,107 @@ int main(int argc, char* argv[])
             j++;
           }
 
-          // copy all the data into lastSentPacket array member
-          memset(lastSent.lastSentData, 0, sizeof(lastSent.lastSentData)); // clear the buffer first, don't want leftover bytes
-          for(int i = 0; i < 524; i++) {
-              lastSent.lastSentData[i] = hs3_buffer[i];
-          }
+          if(lastRecvAckNum != hs3_header.getSeqNum()) {
+            // congestion avoidance protocol
+            ss_thresh = cwd / 2; 
+            cwd = 512;
 
-          printStatement("SEND", hs3_header.getSeqNum(), hs3_header.getAckNum(), hs3_header.getConnectionId(), cwd, ss_thresh, hs3_header.getFlags());
-          sent = sendto(sockfd, hs3_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen); 
-          if(sent > 0) {
-            wc += sent;
+            unsigned char* retransmit_header = new unsigned char[12];
+            for(int i = 0; i < 12; i++) {
+              retransmit_header[i] = lastSent.lastSentData[i];
+            }
+            TCPheader re_header;
+            re_header.parseBuffer(retransmit_header);
+            // retransmitting the data of last sentPacket
+            printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
+
+            if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
+            {
+              std::cerr << "ERROR: Could not send file\n";
+              exit(1); 
+            }
+            continue;
           }
           else {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
+            // copy all the data into lastSentPacket array member
+            lastSentMode = 2;
+            memset(lastSent.lastSentData, 0, sizeof(lastSent.lastSentData)); // clear the buffer first, don't want leftover bytes
+            for(int i = 0; i < 524; i++) {
+                lastSent.lastSentData[i] = hs3_buffer[i];
+            }
+
+            printStatement("SEND", hs3_header.getSeqNum(), hs3_header.getAckNum(), hs3_header.getConnectionId(), cwd, ss_thresh, hs3_header.getFlags());
+            sent = sendto(sockfd, hs3_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen); 
+            if(sent > 0) {
+              wc += sent;
+              // lastSequenceSent = seq_num;
+              lastSequenceSent += open_file.gcount();
+              lastSequenceSent %= 102401;
+              totalSeqenceSent += open_file.gcount();
+            }
+            else {
+              std::cerr << "ERROR: Could not send file\n";
+              exit(1); 
+            }
           }
+          lastSequenceNum = hs3_header.getSeqNum() + open_file.gcount();
+          lastSequenceNum %= 102401;
           delete(hs3_buff);  
 
-          // if(open_file.gcount() < 512) {
-          //   lastSequenceSent = hs3_header.getSeqNum() + open_file.gcount();
-          // }
-
           //if cwnd is larger than our packet size, send another one
-          // int sent_packet = 512; 
-          // while(sent_packet < cwd && !open_file.eof()) {
-          //   seq_num += 512;
-          //   TCPheader packet_header(seq_num, 0, cid, 0, 0, 0);
-          //   unsigned char* packet_buf = new unsigned char[12]; 
-          //   packet_buf = packet_header.toCharBuffer(); 
-          //   pointerToBuffer(packet_buf, hs3_buffer, 12); 
+          int sent_packet = 512; 
+          while(sent_packet < cwd && !open_file.eof()) {
+            seq_num += 512;
+            seq_num %= 102401;
+            TCPheader packet_header(seq_num, 0, cid, 0, 0, 0);
+            unsigned char* packet_buf = new unsigned char[12]; 
+            packet_buf = packet_header.toCharBuffer(); 
+            pointerToBuffer(packet_buf, hs3_buffer, 12); 
 
-          //   open_file.seekg(read_offset);
-          //   open_file.read(read_buffer, 512);
-          //   read_offset += open_file.gcount();
+            open_file.seekg(read_offset);
+            open_file.read(read_buffer, 512);
+            read_offset += open_file.gcount();
 
-          //   int k = 0;
-          //   for(int i = 12; i < 524; i++) {
-          //     hs3_buffer[i] = read_buffer[k];
-          //     k++;
-          //   }
+            int k = 0;
+            for(int i = 12; i < 524; i++) {
+              hs3_buffer[i] = read_buffer[k];
+              k++;
+            }
 
-          //   // copy all the data into lastSentPacket array member
-          //   // memset(lastSent.lastSentData, 0, sizeof(lastSent.lastSentData)); // clear the buffer first, don't want leftover bytes
-          //   // for(int i = 0; i < 524; i++) {
-          //   //     lastSent.lastSentData[i] = hs3_buffer[i];
-          //   // }
+            // copy all the data into lastSentPacket array member
+            memset(lastSent.lastSentData, 0, sizeof(lastSent.lastSentData)); // clear the buffer first, don't want leftover bytes
+            for(int i = 0; i < 524; i++) {
+                lastSent.lastSentData[i] = hs3_buffer[i];
+            }
+            lastSentMode = 2;
 
-          //   printStatement("SEND", packet_header.getSeqNum(), packet_header.getAckNum(), packet_header.getConnectionId(), cwd, ss_thresh, packet_header.getFlags());
-          //   sent = sendto(sockfd, hs3_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen); 
-          //   if(sent > 0) {
-          //     wc += sent;
-          //   }
-          //   else {
-          //     std::cerr << "ERROR: Could not send file\n";
-          //     exit(1); 
-          //   }
-          //   delete(packet_buf);
-          //   sent_packet += 512;
-
-          //   if(open_file.gcount() < 512) {
-          //     lastSequenceSent = packet_header.getSeqNum() + open_file.gcount();
-          //   }
-          // }
+            printStatement("SEND", packet_header.getSeqNum(), packet_header.getAckNum(), packet_header.getConnectionId(), cwd, ss_thresh, packet_header.getFlags());
+            sent = sendto(sockfd, hs3_buffer, (open_file.gcount() + 12), 0, res->ai_addr, res->ai_addrlen); 
+            if(sent > 0) {
+              wc += sent;
+              // lastSequenceSent = seq_num;
+              lastSequenceSent += open_file.gcount();
+              lastSequenceSent %= 102401;
+              totalSeqenceSent += open_file.gcount();
+            }
+            else {
+              std::cerr << "ERROR: Could not send file\n";
+              exit(1); 
+            }
+            delete(packet_buf);
+            sent_packet += 512;
+            lastSequenceNum = packet_header.getSeqNum() + open_file.gcount();     
+            lastSequenceNum %= 102401;                  
+          }
         }
         // received FIN-ACK or FIN from server
         if ((f[2] && f[0]) || f[0])
         {
           // std::cout << "here" << std::endl;
           // // set non-blocking
-          long arg = fcntl(sockfd, F_GETFL, NULL); 
-          arg |= O_NONBLOCK; 
-          fcntl(sockfd, F_SETFL, arg);        
+          // long arg = fcntl(sockfd, F_GETFL, NULL); 
+          // arg |= O_NONBLOCK; 
+          // fcntl(sockfd, F_SETFL, arg);        
 
           unsigned char* close_conn_buff = new unsigned char[12]; 
           seq_num = recv_header.getAckNum();
