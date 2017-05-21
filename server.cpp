@@ -351,12 +351,12 @@ int main(int argc, char* argv[])
 
 			    std::ofstream new_file;
 			    new_file.open(file_des[conn_id-1].file_name, std::ios::app | std::ios::binary );
-
 			    new_file.write(data_buffer, rc - 12);
 			    file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
 			    new_file.close();
 			    // asdf += (rc - 12);
+			    std::cout << file_des[conn_id-1].file_size << std::endl;
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
 			    if (hs3_header.getAckNum() == 0)
