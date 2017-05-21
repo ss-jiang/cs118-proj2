@@ -269,21 +269,17 @@ int main(int argc, char* argv[])
           }
         }
 
-        if(f[2] && fin_sent && !f[0]) { // scenario, sent fin, received only ack, separate case than fin-ack
-          // // // set non-blocking
-          // long arg = fcntl(sockfd, F_GETFL, NULL); 
-          // arg |= O_NONBLOCK; 
-          // fcntl(sockfd, F_SETFL, arg);        
-
+        if(f[2] && fin_sent && !f[0]) { // scenario, sent fin, received only ack, separate case than fin-ack        
           //once recieved FIN-ACK, have 2 seconds before client terminates
-          timeval finTimeval; 
-          finTimeval.tv_sec = 2; 
-          finTimeval.tv_usec = 0;
-          fd_set fdset; 
-          FD_ZERO(&fdset);
-          FD_SET(sockfd, &fdset);
           int rv; 
           while(1) {
+            timeval finTimeval; 
+            finTimeval.tv_sec = 2; 
+            finTimeval.tv_usec = 0;
+            fd_set fdset; 
+            FD_ZERO(&fdset);
+            FD_SET(sockfd, &fdset);
+
             //std::cout << "checkers" << std::endl; 
             rv = select(sockfd + 1, &fdset, NULL, NULL, &finTimeval);
             recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
@@ -334,6 +330,8 @@ int main(int argc, char* argv[])
                   std::cerr << "ERROR: Could not send file\n";
                   exit(1); 
                 }
+                lastSequenceNum += 1;
+                lastSequenceNum %= 102401;
               }
             }
           }
@@ -344,6 +342,7 @@ int main(int argc, char* argv[])
         {
           syn_ack_established = true;
         }
+
         // if done sending the file, reading is EOF
         if (f[2] && open_file.eof() && !fin_sent)
         {
@@ -386,6 +385,7 @@ int main(int argc, char* argv[])
           lastSequenceNum += 1;
           lastSequenceNum %= 102401;
         }
+
         // while we get an ack from the server and we havent finished sending the file
         if (f[2] && syn_ack_established && !open_file.eof())
         {
