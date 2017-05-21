@@ -7,3 +7,5 @@ client
 *.dat
 *.htm
 /cs118_proj2_sample_client_server
+*.html
+*upload_test

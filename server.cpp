@@ -46,72 +46,6 @@ void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uin
   std::cout << std::endl; 
 }
 
-// void handle_thread(struct sockaddr_in clientAddr, int clientSockfd, int connection_number, std::string file_dir)
-// {
-// 	char ipstr[INET_ADDRSTRLEN] = {'\0'};
-
-// 	inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-// 	std::cout << "Accept a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
-
-// 	std::string save_name = file_dir + "/" + std::to_string(connection_number) + ".file";
-
-// 	// Set to blocking mode again... 
-// 	long arg = fcntl(clientSockfd, F_GETFL, NULL); 
-// 	arg &= (~O_NONBLOCK);
-// 	fcntl(clientSockfd, F_SETFL, arg); 
-
-// 	// timeout variables
-// 	fd_set readfds;
-// 	struct timeval tv;
-// 	FD_ZERO(&readfds);
-// 	FD_SET(clientSockfd, &readfds);
-// 	tv.tv_sec = 10;
-// 	int rv = select(clientSockfd+1, &readfds, NULL, NULL, &tv);
-
-// 	if (rv == -1) 
-// 	{
-// 		std::cerr << "ERROR: Select() failure" << std::endl;
-// 	    exit(1);
-// 	} 
-// 	else if (rv == 0) 
-// 	{
-// 		// variables used to open and write to a file
-// 		std::ofstream new_file;
-// 		new_file.open(save_name, std::ios::out | std::ios::binary);
-
-// 		//std::string err = "ERROR";
-// 		new_file.write("ERROR", 5);
-// 	    std::cerr << "Timeout occurred:  No data after 10 seconds\n";
-// 	} 
-// 	else 
-// 	{
-// 		// variables used to open and write to a file
-// 		std::ofstream new_file;
-// 		new_file.open(save_name, std::ios::out | std::ios::binary);
-// 		char receive_buf[1024] = {0};
-// 		int file_size = 0;
-// 		int rc = 0;
-
-// 		/* get the file name from the client */
-// 	    while( (rc = recv(clientSockfd, receive_buf, sizeof(receive_buf), 0)) > 0)
-// 	    {
-// 		    if (rc == -1) {
-// 		    	std::cerr << "ERROR: recv() failed\n";
-// 				exit(1);
-// 		    }
-
-// 		    new_file.write(receive_buf, rc);
-// 		    file_size += rc;
-// 		    memset(receive_buf, 0, sizeof(receive_buf));
-// 		}
-
-// 		std::cout << "Saved file as " << save_name << " : " << file_size << " bytes\n";
-// 		file_size = 0;
-// 		new_file.close();
-// 	}
-// 	close(clientSockfd);
-// 
-
 struct file_metadata {
 	std::string file_name;
 	// std::ofstream* file_d;
@@ -359,15 +293,19 @@ int main(int argc, char* argv[])
 			    std::cout << file_des[conn_id-1].file_size << std::endl;
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
-			    if (hs3_header.getAckNum() == 0)
-			    {
-			    	server_seq = file_des[conn_id-1].last_sent_seq;
-			    }
-			    else
-			    {
-			    	server_seq = (hs3_header.getAckNum()) % 102401;
-			    	file_des[conn_id-1].last_sent_seq = server_seq;
-			    }
+			    // THIS MAY BE WRONG 
+			    server_seq = hs3_header.getAckNum();
+			    // THIS MAY BE WRONG 
+			    
+			    // if (hs3_header.getAckNum() == 0)
+			    // {
+			    // 	server_seq = file_des[conn_id-1].last_sent_seq;
+			    // }
+			    // else
+			    // {
+			    // 	server_seq = (hs3_header.getAckNum()) % 102401;
+			    // 	file_des[conn_id-1].last_sent_seq = server_seq;
+			    // }
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
@@ -391,7 +329,5 @@ int main(int argc, char* argv[])
 
 
 	close(sockfd);
-	// close(clientSockfd);
-
    	exit(0);
 }
