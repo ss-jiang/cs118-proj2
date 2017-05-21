@@ -32,43 +32,31 @@ void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
 }
 
 void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, int cwd, int ss_thresh, std::bitset<16> fl) {
-  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh << " ";
+  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh;
   if (fl[2]) {
-    std::cout << "ACK";
-    if(fl[1] || fl[0]) {
-      std::cout << " "; 
-    }
+    std::cout << " ACK";
   }
   if(fl[1]) {
-    std::cout << "SYN";
-    if(fl[0]) {
-      std::cout << " ";
-    } 
+    std::cout << " SYN";
   }
   if(fl[0]) {
-    std::cout << "FIN"; 
+    std::cout << " FIN"; 
   }
-  std::cout << "\n"; 
+  std::cout << std::endl; 
 }
 
 void printDropStatement(std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, std::bitset<16> fl) {
-  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " ";
+  std::cout << action << " " << seq_num << " " << ack_num << " " << cid;
   if (fl[2]) {
-    std::cout << "ACK";
-    if(fl[1] || fl[0]) {
-      std::cout << " "; 
-    }
+    std::cout << " ACK";
   }
   if(fl[1]) {
-    std::cout << "SYN";
-    if(fl[0]) {
-      std::cout << " ";
-    } 
+    std::cout << " SYN"; 
   }
   if(fl[0]) {
-    std::cout << "FIN"; 
+    std::cout << " FIN"; 
   }
-  std::cout << "\n"; 
+  std::cout << std::endl; 
 }
 
 int main(int argc, char* argv[])
@@ -102,9 +90,9 @@ int main(int argc, char* argv[])
   int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
   // // set non-blocking
-  // long arg = fcntl(sockfd, F_GETFL, NULL); 
-  // arg |= O_NONBLOCK; 
-  // fcntl(sockfd, F_SETFL, arg); 
+  long arg = fcntl(sockfd, F_GETFL, NULL); 
+  arg |= O_NONBLOCK; 
+  fcntl(sockfd, F_SETFL, arg); 
 
   // stuff to get address information and connect
   struct addrinfo hints, *res;
@@ -161,12 +149,31 @@ int main(int argc, char* argv[])
 
   if (sent > 0)
   {
+    timeval clientTimeval; 
+    clientTimeval.tv_sec = 10; 
+    clientTimeval.tv_usec = 0;
+    fd_set fdset; 
+    FD_ZERO(&fdset);
+    FD_SET(sockfd, &fdset);
+    int rv;
+
     while (1)
     {
+      rv = select(sockfd + 1, &fdset, NULL, NULL, &clientTimeval);
       int recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
-      if (recv > 0)
+      if (rv == 0)
       {
-       
+        std::cout << "10 SECOND TIMEOUT\n";
+        open_file.close();
+        close(sockfd);
+        exit(1);
+      }
+      else if (rv < 0)
+      {
+        break;
+      }
+      else if (rv > 0 && recv > 0)
+      {
         unsigned char* headers_buf = new unsigned char[12]; 
         for(int i = 0; i < 12; i++) {
           headers_buf[i] = recv_buffer[i]; 
@@ -202,10 +209,11 @@ int main(int argc, char* argv[])
           timeval finTimeval; 
           finTimeval.tv_sec = 2; 
           finTimeval.tv_usec = 0;
-          fd_set fdset; 
+          // fd_set fdset; 
           FD_ZERO(&fdset);
           FD_SET(sockfd, &fdset);
-          int rv; 
+          // int rv;
+           
           while(1) {
             //std::cout << "checkers" << std::endl; 
             rv = select(sockfd + 1, &fdset, NULL, NULL, &finTimeval);
@@ -216,7 +224,7 @@ int main(int argc, char* argv[])
               //std::cout << "Timed out son" << std::endl;
               open_file.close();
               close(sockfd);
-              return 0;
+              exit(0);
             }
             else if (rv < 0) {
               break;

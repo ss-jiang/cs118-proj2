@@ -26,8 +26,9 @@ bool SIG_HANDLER_CALLED = 0;
 
 void signal_handler(int signum)
 {
+	std::cout.flush();
 	SIG_HANDLER_CALLED = 1;
-	std::cout << "Signal handler called" << std::endl;
+	// std::cout << "Signal handler called" << std::endl;
 	exit(0);
 }
 
@@ -42,7 +43,7 @@ void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uin
   if(fl[0]) {
     std::cout << " FIN"; 
   }
-  std::cout << "\n"; 
+  std::cout << std::endl; 
 }
 
 // void handle_thread(struct sockaddr_in clientAddr, int clientSockfd, int connection_number, std::string file_dir)
@@ -214,6 +215,7 @@ int main(int argc, char* argv[])
 	// 	std::cerr << "ERROR: Failed to listen to socket" << std::endl;
 	// 	exit(-1);
 	// }
+	// sleep(30);
 
 	std::vector<file_metadata> file_des;
 	std::vector<uint16_t> cur_connIds;
