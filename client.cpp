@@ -159,87 +159,78 @@ int main(int argc, char* argv[])
     hs1_buf[i] = buf[i];
   }
 
+  int num_timeouts = 0;
+  bool successful_retransmission = false; 
   std::bitset<16> fl = header.getFlags();
 
   printStatement("SEND", seq_num, ack_num, cid, cwd, ss_thresh, fl);
 
   int sent = sendto(sockfd, hs1_buf, sizeof(hs1_buf), 0, res->ai_addr, res->ai_addrlen);
+  int rv;
 
   if (sent > 0)
   {
     while (1)
     {
       timeval clientTimeval; 
-      clientTimeval.tv_sec = 10; 
-      clientTimeval.tv_usec = 0;
+      clientTimeval.tv_sec = 0; 
+      clientTimeval.tv_usec = 500000;
       fd_set fdset; 
       FD_ZERO(&fdset);
       FD_SET(sockfd, &fdset);
-      int rv;
 
-      //Set receive timeout of 0.5 s
-      timeval recvTimeval;
-      recvTimeval.tv_sec = 0;
-      recvTimeval.tv_usec = 500000;
-      fd_set fdsets; 
-      FD_ZERO(&fdsets);
-      FD_SET(sockfd, &fdsets);
-      int rc;
-
-      rc = select(sockfd + 1, &fdset, NULL, NULL, &recvTimeval);
       rv = select(sockfd + 1, &fdset, NULL, NULL, &clientTimeval);
       int recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
-      if (rv == 0)
-      {
-        std::cout << "10 SECOND TIMEOUT\n";
-        open_file.close();
-        close(sockfd);
-        exit(1);
-      }
-      else if (rv < 0)
-      {
-        break;
-      }
-      if (rc == 0) { // retransmission timeout
-        // congestion avoidance protocol
-        ss_thresh = cwd / 2; 
-        cwd = 512;
-        unsigned char* retransmit_header = new unsigned char[12];
-        for(int i = 0; i < 12; i++) {
-          retransmit_header[i] = lastSent.lastSentData[i];
-        }
-        TCPheader re_header;
-        re_header.parseBuffer(retransmit_header); 
 
-        unsigned char retransmit_data[512]; 
-        if(lastSentMode == 1) {
-          //only retransmitting headers
-          unsigned char rebuf[12]; 
-          pointerToBuffer(re_header.toCharBuffer(), rebuf, 12); 
-          if (sendto(sockfd, rebuf, sizeof(rebuf), 0, res->ai_addr, res->ai_addrlen) < 0)
-          {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
+      if (rv == 0) // waited 0.5 seconds
+      {
+        if (!successful_retransmission) {
+          // congestion avoidance protocol
+          ss_thresh = cwd / 2; 
+          cwd = 512;
+          unsigned char* retransmit_header = new unsigned char[12];
+          for(int i = 0; i < 12; i++) {
+            retransmit_header[i] = lastSent.lastSentData[i];
           }
-        } else {
-          // retransmitting the data of last sentPacket
-          if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
-          {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
+          TCPheader re_header;
+          re_header.parseBuffer(retransmit_header); 
+
+          unsigned char retransmit_data[512]; 
+          if(lastSentMode == 1) {
+            //only retransmitting headers
+            unsigned char rebuf[12]; 
+            pointerToBuffer(re_header.toCharBuffer(), rebuf, 12); 
+            if (sendto(sockfd, rebuf, sizeof(rebuf), 0, res->ai_addr, res->ai_addrlen) < 0)
+            {
+              std::cerr << "ERROR: Could not send file\n";
+              exit(1); 
+            }
+          } else {
+            // retransmitting the data of last sentPacket
+            if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
+            {
+              std::cerr << "ERROR: Could not send file\n";
+              exit(1); 
+            }
           }
+
+          printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
+          successful_retransmission = true;
+          num_timeouts = 0;
         }
 
-        printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
-
+        num_timeouts++;
+        if (num_timeouts == 20) {
+          std::cout << "10 SECOND TIMEOUT\n";
+          open_file.close();
+          close(sockfd);
+          exit(1);
+        }
         continue;
-      } else if (rc < 0) {
-        break;
       }
 
-      if (rv > 0 && recv > 0 && rc > 0)
+      if (rv > 0 && recv > 0)
       {
-       
         unsigned char* headers_buf = new unsigned char[12]; 
         for(int i = 0; i < 12; i++) {
           headers_buf[i] = recv_buffer[i]; 
@@ -263,6 +254,9 @@ int main(int argc, char* argv[])
           }
           if(cwd >= ss_thresh) {
             cwd += (512 * 512) / cwd; 
+          }
+          if (cwd > 51200) {
+            cwd = 51200;
           }
           if(lastSequenceNum != recv_header.getAckNum()){
             continue;
@@ -309,7 +303,7 @@ int main(int argc, char* argv[])
               } else { // send ACK to FIN packet
                 unsigned char* wait_buffer = new unsigned char[12]; 
                 seq_num = recv_header.getAckNum();
-                ack_num = recv_header.getSeqNum() + 1; // 0, no ACK flag set
+                ack_num = recv_header.getSeqNum(); // 0, no ACK flag set
                 cid = recv_header.getConnectionId();
                 TCPheader wait_header(seq_num, ack_num, cid, 1, 0, 0);
                 wait_buffer = wait_header.toCharBuffer();
@@ -584,6 +578,11 @@ int main(int argc, char* argv[])
               pointerToBuffer(wait_buffer, waiting_buf, 12);
 
               printStatement("SEND", wait_header.getSeqNum(), wait_header.getAckNum(), wait_header.getConnectionId(), cwd, ss_thresh, wait_header.getFlags());
+              if (sendto(sockfd, waiting_buf, sizeof(waiting_buf), 0, res->ai_addr, res->ai_addrlen) < 0)
+              {
+                std::cerr << "ERROR: Could not send file\n";
+                exit(1); 
+              }
             }
           }
         }

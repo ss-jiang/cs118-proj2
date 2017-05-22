@@ -223,7 +223,7 @@ int main(int argc, char* argv[])
 			    	std::cerr << "ERROR: Could not send response header\n";
 			        exit(1); 
 			    }
-			    // sleep(5);
+			    // sleep(11);
 		    }
 		    // FIN flag received
 			if (f[0])
@@ -293,19 +293,19 @@ int main(int argc, char* argv[])
 			    // asdf += (rc - 12);
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
-			    // THIS MAY BE WRONG 
-			    server_seq = hs3_header.getAckNum();
-			    // THIS MAY BE WRONG 
-			    
-			    // if (hs3_header.getAckNum() == 0)
-			    // {
-			    // 	server_seq = file_des[conn_id-1].last_sent_seq;
-			    // }
-			    // else
-			    // {
-			    // 	server_seq = (hs3_header.getAckNum()) % 102401;
-			    // 	file_des[conn_id-1].last_sent_seq = server_seq;
-			    // }
+			    // // THIS MAY BE WRONG 
+			    // server_seq = hs3_header.getAckNum() + 1;
+			    // // THIS MAY BE WRONG 
+
+			    if (hs3_header.getAckNum() == 0)
+			    {
+			    	server_seq = file_des[conn_id-1].last_sent_seq;
+			    }
+			    else
+			    {
+			    	server_seq = (hs3_header.getAckNum()) % 102401;
+			    	file_des[conn_id-1].last_sent_seq = server_seq;
+			    }
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
