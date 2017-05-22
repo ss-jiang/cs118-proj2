@@ -32,7 +32,7 @@ void signal_handler(int signum)
 	exit(0);
 }
 
-void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, int cwd, int ss_thresh, std::bitset<16> fl) {
+void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, int cwd, int ss_thresh, std::bitset<16> fl, int dup) {
   std::cout << action << " " << seq_num << " " << ack_num << " " << cid << " " << cwd << " " << ss_thresh;
   if (fl[2]) {
     std::cout << " ACK";
@@ -43,14 +43,20 @@ void printStatement (std::string action, uint32_t seq_num, uint32_t ack_num, uin
   if(fl[0]) {
     std::cout << " FIN"; 
   }
+  if(dup) {
+  	std::cout << " DUP";
+  }
   std::cout << std::endl; 
 }
 
+void printDropStatement(std::string action, uint32_t seq_num, uint32_t ack_num, uint16_t cid, std::bitset<16> fl) {
+  std::cout << action << " " << seq_num << " " << ack_num << " " << cid << std::endl;
+}
+
 struct file_metadata {
-	std::string file_name;
 	// std::ofstream* file_d;
 	uint32_t last_sent_seq;
-	int file_size;
+	uint32_t next_expected_seq;
 };
 
 void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
@@ -62,16 +68,6 @@ void pointerToBuffer(unsigned char* buf, unsigned char dest_buf[], int bytes)
 }
 
 bool in_fin_vector(std::vector<uint16_t>& in_vector, uint16_t& id)
-{
-	for (unsigned int i = 0; i < in_vector.size(); i++)
-	{
-		if (in_vector[i] == id)
-			return true;
-	}
-	return false;
-}
-
-bool in_conn_id(std::vector<uint16_t>& in_vector, uint16_t id)
 {
 	for (unsigned int i = 0; i < in_vector.size(); i++)
 	{
@@ -100,6 +96,9 @@ int main(int argc, char* argv[])
    	std::string file_dir = argv[2];
    	struct addrinfo hints, *res;
     int status;
+    std::string file_name_1 = file_dir + "/";  
+    std::string file_name_2 = ".file";
+    std::ofstream new_file;
 
    	// Check that the port number is in range
    	if (port_num < 1024 || port_num > 65535) {
@@ -139,9 +138,9 @@ int main(int argc, char* argv[])
 	}
 
 	// set non-blocking
-	// long arg = fcntl(sockfd, F_GETFL, NULL); 
-	// arg |= O_NONBLOCK; 
-	// fcntl(sockfd, F_SETFL, arg); 
+	long arg = fcntl(sockfd, F_GETFL, NULL); 
+	arg |= O_NONBLOCK; 
+	fcntl(sockfd, F_SETFL, arg); 
 
 	// set socket to listen status
 	// UDP does not need to listen since it's connectionless
@@ -152,7 +151,6 @@ int main(int argc, char* argv[])
 	// sleep(30);
 
 	std::vector<file_metadata> file_des;
-	std::vector<uint16_t> cur_connIds;
 	std::vector<uint16_t> fin_connIds;
 
 	int cwd = 512; 
@@ -165,15 +163,13 @@ int main(int argc, char* argv[])
 	uint32_t server_seq = 4321;
     uint32_t server_ack;
     uint16_t cid = 0; 
-    // uint32_t asdf = 0;
-    // uint32_t asdf2 = 0;
+
 	// UDP, don't need to connect since no concept of connection
 	// use recvfrom() to read
 	while(1)
 	{
 		// receive first part of handshake 
 		int rc = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-		// asdf2 += (rc - 12);
 	    if (rc > 0)
 	    {
 	    	// isolate the header bytes from the packet
@@ -184,11 +180,35 @@ int main(int argc, char* argv[])
 
 		    TCPheader header;
 		    header.parseBuffer(headers_buf);
-		    printStatement("RECV", header.getSeqNum(), header.getAckNum(), header.getConnectionId(), cwd, ss_thresh, header.getFlags());	
+		    printStatement("RECV", header.getSeqNum(), header.getAckNum(), header.getConnectionId(), cwd, ss_thresh, header.getFlags(), 0);	
 		    // check flags, we need the SYN/ACK/FIN flags and the connection id
 		    std::bitset<16> f = header.getFlags();
 
 		    uint16_t conn_id = header.getConnectionId();
+
+		    // if receive a packet that is out of sequence
+		    if (conn_id > 0 && file_des[conn_id-1].next_expected_seq != header.getSeqNum())
+		    {
+                printDropStatement("DROP", header.getSeqNum(), 0, header.getConnectionId(), header.getFlags()); 
+                unsigned char* drop_buff = new unsigned char[12]; 
+	            server_seq = 4322; // 0, no ACK flag set
+	            server_ack = file_des[conn_id-1].next_expected_seq;
+	            cid = header.getConnectionId();
+
+	            TCPheader drop_header(server_seq, server_ack, cid, 1, 0, 0);
+	            drop_buff = drop_header.toCharBuffer();
+
+	            unsigned char drop_buf[12];
+	            pointerToBuffer(drop_buff, drop_buf, 12);
+
+	            printStatement("SEND", server_seq, server_ack, drop_header.getConnectionId(), cwd, ss_thresh, drop_header.getFlags(), 1);
+                if (sendto(sockfd, drop_buf, sizeof(drop_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+			    {
+			    	std::cerr << "ERROR: Could not send response header\n";
+			        exit(1); 
+			    }
+			    continue;          
+		    }
 
 		    // received SYN from client 
 		    if (f[1])
@@ -201,12 +221,14 @@ int main(int argc, char* argv[])
 				std::ofstream new_file;
 
 				file_metadata new_connection_data;
-				new_connection_data.file_size = 0;
-				new_connection_data.file_name = file_dir + "/" + std::to_string(cid) + ".file";
-				new_connection_data.last_sent_seq = server_seq;
+				// new_connection_data.file_size = 0;
+				// new_connection_data.file_name = file_dir + "/" + std::to_string(cid) + ".file";
+				new_connection_data.last_sent_seq = (server_ack % 102401);
+				new_connection_data.next_expected_seq = server_ack;
 
 				file_des.push_back(new_connection_data);
-				cur_connIds.push_back(cid);
+
+				// new_file.open()
 
 			    // send SYN-ACK to client, responds to receiving a packet from the client
 			    // response headers needs to be set up with the receiver header's ack number
@@ -217,13 +239,12 @@ int main(int argc, char* argv[])
 			    unsigned char hs2_buf[12];
 			    pointerToBuffer(resp_buf, hs2_buf, 12);
 
-			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags());	
+			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags(), 0);	
 			    if (sendto(sockfd, hs2_buf, sizeof(hs2_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 			    {
 			    	std::cerr << "ERROR: Could not send response header\n";
 			        exit(1); 
 			    }
-			    // sleep(11);
 		    }
 		    // FIN flag received
 			if (f[0])
@@ -241,7 +262,7 @@ int main(int argc, char* argv[])
 	            unsigned char fin_buf[12];
 	            pointerToBuffer(fin_ack_buff, fin_buf, 12);
 
-	            printStatement("SEND", fin_ack_header.getSeqNum(), fin_ack_header.getAckNum(), fin_ack_header.getConnectionId(), cwd, ss_thresh, fin_ack_header.getFlags());	
+	            printStatement("SEND", fin_ack_header.getSeqNum(), fin_ack_header.getAckNum(), fin_ack_header.getConnectionId(), cwd, ss_thresh, fin_ack_header.getFlags(), 0);	
 	            if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
 	            {
 	            	std::cerr << "ERROR: Could not send file\n";
@@ -256,24 +277,9 @@ int main(int argc, char* argv[])
 
 	           	delete(fin_ack_buff);
 			}
-		    // client sends ACK to server's FIN-ACK
-			if (f[2] && in_fin_vector(fin_connIds, conn_id) && conn_id > 0)
-			{
-				//std::cout << "closing connection: " << conn_id << std::endl;
-				for (unsigned int i = 0; i < cur_connIds.size(); i++)
-				{
-					if (cur_connIds[i] == conn_id)
-					{
-						// std::cout << "TOTAL RECEIVED: " << asdf2 << std::endl;
-						// std::cout << "TOTAL WRITTEN: " << asdf << std::endl;
-						cur_connIds.erase(cur_connIds.begin()+i);
-						// std::cout << "deleted connection id: " << conn_id << std::endl;
-					}
-				}
-			}
 		    // receiving 3rd part of the handshake, the data begins to be received here
 		    // ACK flag and no SYN flag
-		    if (((f[2] && !f[1]) || in_conn_id(cur_connIds, conn_id)) && !in_fin_vector(fin_connIds, conn_id) && conn_id > 0)
+		    if (conn_id > 0 && !in_fin_vector(fin_connIds, conn_id))
 		    {
 	            unsigned char* headers3_buf = new unsigned char[12]; 
 	            for(int i = 0; i < 12; i++) {
@@ -284,23 +290,24 @@ int main(int argc, char* argv[])
 			    hs3_header.parseBuffer(headers3_buf);
 
 			    char data_buffer[512]; 
-		    	int j = 0; 
 			    for(unsigned int i = 12; i < sizeof(buf); i++) {
-			    	data_buffer[j] = buf[i];
-			    	j++;
+			    	data_buffer[i - 12] = buf[i];
 			    }
 
-			    std::ofstream new_file;
-			    new_file.open(file_des[conn_id-1].file_name, std::ios::app | std::ios::binary );
+			    // file_des[conn_id-1].next_expected_seq += (rc - 12);
+			    // file_des[conn_id-1].next_expected_seq %= 102401;
+			    // std::cout << "NEXT EXPECTED: " << file_des[conn_id-1].next_expected_seq << std::endl;
+
+			    std::string open_name = file_name_1 + std::to_string(conn_id) + file_name_2;
+			    new_file.open(open_name, std::ios::app | std::ios::binary );
 
 			    new_file.write(data_buffer, rc - 12);
-			    file_des[conn_id-1].file_size += (rc - 12);
+			    // file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
 			    new_file.close();
-			    // asdf += (rc - 12);
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
-
+			    file_des[conn_id-1].next_expected_seq = server_ack;
 			    // // THIS MAY BE WRONG 
 			    // server_seq = hs3_header.getAckNum() + 1;
 			    // // THIS MAY BE WRONG 
@@ -321,7 +328,7 @@ int main(int argc, char* argv[])
 	            unsigned char ack_buffer[12]; 
 	            pointerToBuffer(ack_buf, ack_buffer, 12);
 
-			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags());	
+			    printStatement("SEND", resp_header.getSeqNum(), resp_header.getAckNum(), resp_header.getConnectionId(), cwd, ss_thresh, resp_header.getFlags(), 0);	
 
 			    // send ACK back to client
 			    if (sendto(sockfd, ack_buffer, sizeof(ack_buffer), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
