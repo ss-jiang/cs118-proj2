@@ -90,6 +90,7 @@ int main(int argc, char* argv[])
   bool syn_ack_established = false;
   int read_offset = 0;
   bool fin_sent = false;
+  bool ack_to_fin_ack = false;
 
   uint32_t lastSequenceSent = 12346;
   uint32_t totalSeqenceSent = 12346;
@@ -133,6 +134,24 @@ int main(int argc, char* argv[])
   // struct sockaddr_storage clientAddr;
   // socklen_t clientAddrSize = sizeof(clientAddr);
 
+  timeval clientTimeval; 
+  clientTimeval.tv_sec = 10; 
+  clientTimeval.tv_usec = 0;
+  fd_set fdset; 
+
+  //Set receive timeout of 0.5 s
+  timeval recvTimeval;
+  recvTimeval.tv_sec = 0;
+  recvTimeval.tv_usec = 500000;
+  fd_set fdsets; 
+
+  // responds to FIN for 2 seconds
+  timeval finTimeval; 
+  finTimeval.tv_sec = 2; 
+  finTimeval.tv_usec = 0;
+  fd_set fdset2;
+  int fin_rv;
+
   //build UDP packet
   std::string src_addr = "127.0.0.1"; 
   // int src_port = 1200; 
@@ -169,24 +188,24 @@ int main(int argc, char* argv[])
   {
     while (1)
     {
-      timeval clientTimeval; 
-      clientTimeval.tv_sec = 10; 
-      clientTimeval.tv_usec = 0;
-      fd_set fdset; 
+      // timeval clientTimeval; 
+      // clientTimeval.tv_sec = 10; 
+      // clientTimeval.tv_usec = 0;
+      // fd_set fdset; 
       FD_ZERO(&fdset);
       FD_SET(sockfd, &fdset);
       int rv;
 
       //Set receive timeout of 0.5 s
-      timeval recvTimeval;
-      recvTimeval.tv_sec = 0;
-      recvTimeval.tv_usec = 500000;
-      fd_set fdsets; 
-      FD_ZERO(&fdsets);
-      FD_SET(sockfd, &fdsets);
-      int rc;
+      // timeval recvTimeval;
+      // recvTimeval.tv_sec = 0;
+      // recvTimeval.tv_usec = 500000;
+      // fd_set fdsets; 
+      // FD_ZERO(&fdsets);
+      // FD_SET(sockfd, &fdsets);
+      // int rc;
 
-      rc = select(sockfd + 1, &fdset, NULL, NULL, &recvTimeval);
+      // rc = select(sockfd + 1, &fdsets, NULL, NULL, &recvTimeval);
       rv = select(sockfd + 1, &fdset, NULL, NULL, &clientTimeval);
       int recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
       if (rv == 0)
@@ -200,46 +219,45 @@ int main(int argc, char* argv[])
       {
         break;
       }
-      if (rc == 0) { // retransmission timeout
-        // congestion avoidance protocol
-        ss_thresh = cwd / 2; 
-        cwd = 512;
-        unsigned char* retransmit_header = new unsigned char[12];
-        for(int i = 0; i < 12; i++) {
-          retransmit_header[i] = lastSent.lastSentData[i];
-        }
-        TCPheader re_header;
-        re_header.parseBuffer(retransmit_header); 
+      // if (rc == 0) { // retransmission timeout
+      //   // congestion avoidance protocol
+      //   ss_thresh = cwd / 2; 
+      //   cwd = 512;
+      //   unsigned char* retransmit_header = new unsigned char[12];
+      //   for(int i = 0; i < 12; i++) {
+      //     retransmit_header[i] = lastSent.lastSentData[i];
+      //   }
+      //   TCPheader re_header;
+      //   re_header.parseBuffer(retransmit_header); 
 
-        unsigned char retransmit_data[512]; 
-        if(lastSentMode == 1) {
-          //only retransmitting headers
-          unsigned char rebuf[12]; 
-          pointerToBuffer(re_header.toCharBuffer(), rebuf, 12); 
-          if (sendto(sockfd, rebuf, sizeof(rebuf), 0, res->ai_addr, res->ai_addrlen) < 0)
-          {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
-          }
-        } else {
-          // retransmitting the data of last sentPacket
-          if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
-          {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
-          }
-        }
+      //   unsigned char retransmit_data[512]; 
+      //   if(lastSentMode == 1) {
+      //     //only retransmitting headers
+      //     unsigned char rebuf[12]; 
+      //     pointerToBuffer(re_header.toCharBuffer(), rebuf, 12); 
+      //     if (sendto(sockfd, rebuf, sizeof(rebuf), 0, res->ai_addr, res->ai_addrlen) < 0)
+      //     {
+      //       std::cerr << "ERROR: Could not send file\n";
+      //       exit(1); 
+      //     }
+      //   } else {
+      //     // retransmitting the data of last sentPacket
+      //     if (sendto(sockfd, lastSent.lastSentData, sizeof(lastSent.lastSentData), 0, res->ai_addr, res->ai_addrlen) < 0)
+      //     {
+      //       std::cerr << "ERROR: Could not send file\n";
+      //       exit(1); 
+      //     }
+      //   }
 
-        printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
+      //   printDupStatement("SEND", re_header.getSeqNum(), re_header.getAckNum(), re_header.getConnectionId(), cwd, ss_thresh, re_header.getFlags());
 
-        continue;
-      } else if (rc < 0) {
-        break;
-      }
+      //   continue;
+      // } else if (rc < 0) {
+      //   break;
+      // }
 
-      if (rv > 0 && recv > 0 && rc > 0)
+      if (rv > 0 && recv > 0)
       {
-       
         unsigned char* headers_buf = new unsigned char[12]; 
         for(int i = 0; i < 12; i++) {
           headers_buf[i] = recv_buffer[i]; 
@@ -253,11 +271,17 @@ int main(int argc, char* argv[])
         // check flags, we need the SYN/ACK/FIN flags and the connection id
         std::bitset<16> f = recv_header.getFlags();
 
+        if (f[0])
+        {
+          FD_ZERO(&fdset2);
+          FD_SET(sockfd, &fdset2);
+        }
+
         printStatement("RECV", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), cwd, ss_thresh, f);
 
         //if ACK is received, then adjust cwd and ss-thresh accordingly 
         if(f[2]) {
-          std::cout << lastSequenceNum << "--" << recv_header.getAckNum() << std::endl;
+          // std::cout << lastSequenceNum << "--" << recv_header.getAckNum() << std::endl;
           if(cwd < ss_thresh) {
             cwd += 512;
           }
@@ -269,34 +293,36 @@ int main(int argc, char* argv[])
           }
         }
 
-        if(f[2] && fin_sent && !f[0]) { // scenario, sent fin, received only ack, separate case than fin-ack        
+        if(fin_sent && f[0]) 
+        { // scenario, sent fin, received only ack, separate case than fin-ack        
           //once recieved FIN-ACK, have 2 seconds before client terminates
-          int rv; 
-          while(1) {
-            timeval finTimeval; 
-            finTimeval.tv_sec = 2; 
-            finTimeval.tv_usec = 0;
-            fd_set fdset; 
-            FD_ZERO(&fdset);
-            FD_SET(sockfd, &fdset);
+          while (1)
+          {
+            fin_rv = select(sockfd + 1, &fdset2, NULL, NULL, &finTimeval);
+            if (ack_to_fin_ack)
+            {
+              recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
+              if (recv > 0)
+                printStatement("RECV", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), cwd, ss_thresh, f);
+            }
 
-            //std::cout << "checkers" << std::endl; 
-            rv = select(sockfd + 1, &fdset, NULL, NULL, &finTimeval);
-            recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
-
-            //std::cout << rv << std::endl;
-            if (rv == 0) {
+            if (fin_rv == 0) 
+            {
               //std::cout << "Timed out son" << std::endl;
               open_file.close();
               close(sockfd);
               return 0;
             }
-            else if (rv < 0) {
+            else if (fin_rv < 0) 
+            {
               break;
             } 
-            else if (rv > 0){ // During the wait, respond to each incoming FIN with an ACK packet; drop any other non-FIN packet.
-              printStatement("RECV", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), cwd, ss_thresh, f);
-              unsigned char* wait_buf = new unsigned char[12]; 
+            else if (fin_rv > 0 && recv > 0)
+            { 
+              // During the wait, respond to each incoming FIN with an ACK packet; drop any other non-FIN packet.
+              // printStatement("RECV", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), cwd, ss_thresh, f);
+              unsigned char* wait_buf = new unsigned char[12];
+
               for(int i = 0; i < 12; i++) {
                 wait_buf[i] = recv_buffer[i]; 
               }
@@ -304,9 +330,9 @@ int main(int argc, char* argv[])
               TCPheader recv_header;
               recv_header.parseBuffer(wait_buf);
               std::bitset<16> waitFlags = recv_header.getFlags();
-              if(waitFlags[1] || waitFlags[2]) { // dropping SYN, ACK packets
-                printDropStatement("DROP", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), recv_header.getFlags());
-              } else { // send ACK to FIN packet
+              if (waitFlags[0])
+              {
+                // send ACK to FIN packet
                 unsigned char* wait_buffer = new unsigned char[12]; 
                 seq_num = recv_header.getAckNum();
                 ack_num = recv_header.getSeqNum() + 1; // 0, no ACK flag set
@@ -331,7 +357,12 @@ int main(int argc, char* argv[])
                   exit(1); 
                 }
                 lastSequenceNum += 1;
-                lastSequenceNum %= 102401;
+                lastSequenceNum %= 102401; 
+                ack_to_fin_ack = true;
+              }
+              else
+              {
+                printDropStatement("DROP", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), recv_header.getFlags());                
               }
             }
           }
@@ -349,16 +380,15 @@ int main(int argc, char* argv[])
 
           unsigned char* fin_buff = new unsigned char[12]; 
           seq_num = recv_header.getAckNum();
+
+          // std::cout << read_offset << std::endl;
+          // std::cout << seq_num << "--" << lastSequenceSent << "--" << totalSeqenceSent << std::endl;
+
           if(lastSequenceSent != seq_num) {
             continue;
           }
           ack_num = 0; // 0, no ACK flag set
           cid = recv_header.getConnectionId();
-
-          // std::cout << read_offset << std::endl;
-          // std::cout << seq_num << "--" << lastSequenceSent << "--" << totalSeqenceSent << std::endl;
-          if (seq_num != lastSequenceSent)
-            continue;
 
           TCPheader fin_header(seq_num, ack_num, cid, 0, 0, 1);
           fin_buff = fin_header.toCharBuffer();
@@ -392,7 +422,7 @@ int main(int argc, char* argv[])
           lastRecvAckNum = (recv_header.getAckNum() % 102401);
           unsigned char* hs3_buff = new unsigned char[12]; 
           seq_num = (recv_header.getAckNum() % 102401);
-          ack_num = recv_header.getSeqNum() + 1; // 1 for now, it needs to be 1 + however much payload we have
+          ack_num = recv_header.getSeqNum() + f[1]; // 1 for now, it needs to be 1 + however much payload we have
           cid = recv_header.getConnectionId();
 
           TCPheader hs3_header(seq_num, ack_num, cid, 1, 0, 0);
@@ -512,79 +542,6 @@ int main(int argc, char* argv[])
             sent_packet += 512;
             lastSequenceNum = packet_header.getSeqNum() + open_file.gcount();     
             lastSequenceNum %= 102401;                  
-          }
-        }
-        // received FIN-ACK or FIN from server
-        if ((f[2] && f[0]) || f[0])
-        {
-          // std::cout << "here" << std::endl;
-          // // set non-blocking
-          // long arg = fcntl(sockfd, F_GETFL, NULL); 
-          // arg |= O_NONBLOCK; 
-          // fcntl(sockfd, F_SETFL, arg);        
-
-          unsigned char* close_conn_buff = new unsigned char[12]; 
-          seq_num = recv_header.getAckNum();
-          ack_num = recv_header.getSeqNum() + 1; // 0, no ACK flag set
-          cid = recv_header.getConnectionId();
-          TCPheader fin_header(seq_num, ack_num, cid, 1, 0, 0);
-          close_conn_buff = fin_header.toCharBuffer();
-
-          unsigned char close_buf[12]; 
-          pointerToBuffer(close_conn_buff, close_buf, 12);
-
-          // copy all the data into lastSentPacket array member
-          memset(lastSent.lastSentData, 0, sizeof(lastSent.lastSentData)); // clear the buffer first, don't want leftover bytes
-          for(int i = 0; i < 12; i++) {
-              lastSent.lastSentData[i] = close_buf[i];
-          }
-          lastSentMode = 1;
-
-          printStatement("SEND", fin_header.getSeqNum(), fin_header.getAckNum(), fin_header.getConnectionId(), cwd, ss_thresh, fin_header.getFlags());
-          if (sendto(sockfd, close_buf, sizeof(close_buf), 0, res->ai_addr, res->ai_addrlen) < 0)
-          {
-            std::cerr << "ERROR: Could not send file\n";
-            exit(1); 
-          }
-          delete(close_conn_buff);
-
-          //once recieved FIN-ACK, have 2 seconds before client terminates
-          timeval finTimeval; 
-          finTimeval.tv_sec = 2; 
-          finTimeval.tv_usec = 0;
-          fd_set fdset; 
-          FD_ZERO(&fdset);
-          FD_SET(sockfd, &fdset);
-          int rv = select(sockfd + 1, &fdset, NULL, NULL, &finTimeval); 
-          recv = recvfrom(sockfd, recv_buffer, 12, 0, res->ai_addr, &res->ai_addrlen);
-
-          if (rv == 0) {
-            //std::cout << "Timed out son" << std::endl;
-            break;
-          } else { // During the wait, respond to each incoming FIN with an ACK packet; drop any other non-FIN packet.
-            unsigned char* wait_buf = new unsigned char[12]; 
-            for(int i = 0; i < 12; i++) {
-              wait_buf[i] = recv_buffer[i]; 
-            }
-
-            TCPheader recv_header;
-            recv_header.parseBuffer(wait_buf);
-            std::bitset<16> waitFlags = recv_header.getFlags();
-            if(waitFlags[1] || waitFlags[2]) { // dropping SYN, ACK packets
-              printDropStatement("DROP", recv_header.getSeqNum(), recv_header.getAckNum(), recv_header.getConnectionId(), recv_header.getFlags());
-            } else { // send ACK to FIN packet
-              unsigned char* wait_buffer = new unsigned char[12]; 
-              seq_num = recv_header.getAckNum();
-              ack_num = recv_header.getSeqNum() + 1; // 0, no ACK flag set
-              cid = recv_header.getConnectionId();
-              TCPheader wait_header(seq_num, ack_num, cid, 1, 0, 0);
-              wait_buffer = wait_header.toCharBuffer();
-
-              unsigned char waiting_buf[12]; 
-              pointerToBuffer(wait_buffer, waiting_buf, 12);
-
-              printStatement("SEND", wait_header.getSeqNum(), wait_header.getAckNum(), wait_header.getConnectionId(), cwd, ss_thresh, wait_header.getFlags());
-            }
           }
         }
         delete(headers_buf);

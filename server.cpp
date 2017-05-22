@@ -247,6 +247,13 @@ int main(int argc, char* argv[])
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
+	            sleep(1);
+	            printStatement("SEND", fin_ack_header.getSeqNum(), fin_ack_header.getAckNum(), fin_ack_header.getConnectionId(), cwd, ss_thresh, fin_ack_header.getFlags());	
+	            if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+	            {
+	            	std::cerr << "ERROR: Could not send file\n";
+                  	exit(1);
+	            }
 	           	delete(fin_ack_buff);
 			}
 		    // client sends ACK to server's FIN-ACK
@@ -285,27 +292,27 @@ int main(int argc, char* argv[])
 
 			    std::ofstream new_file;
 			    new_file.open(file_des[conn_id-1].file_name, std::ios::app | std::ios::binary );
+
 			    new_file.write(data_buffer, rc - 12);
 			    file_des[conn_id-1].file_size += (rc - 12);
 			    memset(buf, 0, sizeof(buf));
 			    new_file.close();
 			    // asdf += (rc - 12);
-			    std::cout << file_des[conn_id-1].file_size << std::endl;
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
 			    // THIS MAY BE WRONG 
 			    server_seq = hs3_header.getAckNum();
 			    // THIS MAY BE WRONG 
 			    
-			    // if (hs3_header.getAckNum() == 0)
-			    // {
-			    // 	server_seq = file_des[conn_id-1].last_sent_seq;
-			    // }
-			    // else
-			    // {
-			    // 	server_seq = (hs3_header.getAckNum()) % 102401;
-			    // 	file_des[conn_id-1].last_sent_seq = server_seq;
-			    // }
+			    if (hs3_header.getAckNum() == 0)
+			    {
+			    	server_seq = file_des[conn_id-1].last_sent_seq;
+			    }
+			    else
+			    {
+			    	server_seq = (hs3_header.getAckNum()) % 102401;
+			    	file_des[conn_id-1].last_sent_seq = server_seq;
+			    }
 
 			    TCPheader resp_header(server_seq, server_ack, hs3_header.getConnectionId(), 1, 0, 0);
 			    unsigned char* ack_buf = resp_header.toCharBuffer(); 
@@ -326,8 +333,6 @@ int main(int argc, char* argv[])
 			delete(headers_buf);
 	    }
 	}
-
-
 	close(sockfd);
    	exit(0);
 }
