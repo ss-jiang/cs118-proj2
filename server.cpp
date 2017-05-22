@@ -247,13 +247,6 @@ int main(int argc, char* argv[])
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
-	            sleep(1);
-	            printStatement("SEND", fin_ack_header.getSeqNum(), fin_ack_header.getAckNum(), fin_ack_header.getConnectionId(), cwd, ss_thresh, fin_ack_header.getFlags());	
-	            if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
-	            {
-	            	std::cerr << "ERROR: Could not send file\n";
-                  	exit(1);
-	            }
 	           	delete(fin_ack_buff);
 			}
 		    // client sends ACK to server's FIN-ACK
