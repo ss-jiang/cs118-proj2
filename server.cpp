@@ -247,6 +247,13 @@ int main(int argc, char* argv[])
 	            	std::cerr << "ERROR: Could not send file\n";
                   	exit(1);
 	            }
+	           	// sleep(1);
+	           	// if (sendto(sockfd, fin_buf, sizeof(fin_buf), 0, (struct sockaddr*)&clientAddr, clientAddrSize) < 0)
+	            // {
+	            // 	std::cerr << "ERROR: Could not send file\n";
+             //      	exit(1);
+	            // }
+
 	           	delete(fin_ack_buff);
 			}
 		    // client sends ACK to server's FIN-ACK
@@ -293,6 +300,7 @@ int main(int argc, char* argv[])
 			    // asdf += (rc - 12);
 
 			    server_ack = (hs3_header.getSeqNum() + (rc - 12)) % 102401;
+
 			    // // THIS MAY BE WRONG 
 			    // server_seq = hs3_header.getAckNum() + 1;
 			    // // THIS MAY BE WRONG 
@@ -326,8 +334,6 @@ int main(int argc, char* argv[])
 			delete(headers_buf);
 	    }
 	}
-
-
 	close(sockfd);
    	exit(0);
 }
