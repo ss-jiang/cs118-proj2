@@ -1,38 +1,22 @@
 # CS118 Project 2
 
+Stan Jiang 104473226
+Kevin Wu 304410695
+
 Template for for [CS118 Spring 2017 Project 2](http://web.cs.ucla.edu/classes/spring17/cs118/project-2.html) 
 
-## Makefile
+## High Level Specification
+### Client
 
-This provides a couple make targets for things.
-By default (all target), it makes the `server` and `client` executables.
+Receive on each iteration of a `while(1)` loop, we create a `TCPheader` object out of it and we used the `TCPheader`'s function to check the flags send in the packet. Depending on the flags set in the packet, we go through and if statement and send the corresponding response to the server. 
 
-It provides a `clean` target, and `tarball` target to create the submission file as well.
+### Server
 
-You will need to modify the `Makefile` to add your userid for the `.tar.gz` turn-in at the top of the file.
+The server has a `while(1)` loop and checks whether anything was received from `recvfrom(...)` on each iteration. A `TCPheader` object is used to parse and determine the flags set in the packet header. If `recvfrom()` returns something greater than `0`, we go into if statement checks and sends back the appropriate `ACK` response. If the sequence number received in the packet does not correspond to the server's expected sequence number in that `connection ID`, the server drops the packet and waits for the client to resend the correct packet.
 
-## Provided Files
+## List of Problems
+### Client
+On the client side, the main problem was congestion control. Detecting packet loss was difficult because we have to store the safe-state of the last received ACK packet. Another problem was keeping track of the sequence numbers when we retransmit the packets. We did not know whether to send after every ACK or wait for all the ACKs to come back from the server.
 
-`server.cpp` and `client.cpp` are the entry points for the server and client part of the project.
-
-## Academic Integrity Note
-
-You are encouraged to host your code in private repositories on [GitHub](https://github.com/), [GitLab](https://gitlab.com), or other places.  At the same time, you are PROHIBITED to make your code for the class project public during the class or any time after the class.  If you do so, you will be violating academic honestly policy that you have signed, as well as the student code of conduct and be subject to serious sanctions.
-
-## Wireshark dissector
-
-For debugging purposes, you can use the wireshark dissector from `tcp.lua`. The dissector requires
-at least version 1.12.6 of Wireshark with LUA support enabled.
-
-To enable the dissector for Wireshark session, use `-X` command line option, specifying the full
-path to the `tcp.lua` script:
-
-    wireshark -X lua_script:./confundo.lua
-
-## TODO
-
-    ###########################################################
-    ##                                                       ##
-    ## REPLACE CONTENT OF THIS FILE WITH YOUR PROJECT REPORT ##
-    ##                                                       ##
-    ###########################################################
+### Server
+We did not run into major problems with the server implementation and it should pass the test cases.
